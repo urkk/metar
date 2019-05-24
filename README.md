@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/urkk/metar.svg?branch=master)](https://travis-ci.org/urkk/metar)
+[![Coverage](https://codecov.io/gh/urkk/metar/branch/master/graph/badge.svg)](https://codecov.io/gh/urkk/metar)
 # METAR
 METAR (METeorological Aerodrome Report) and TAF (terminal aerodrome forecast) message decoder for use in bots, templates and other data visualization.
 
