@@ -1,0 +1,21 @@
+mode: set
+metar\wind\wind.go:22.30,24.2 1 1
+metar\wind\wind.go:26.31,28.2 1 1
+metar\wind\wind.go:30.35,32.2 1 1
+metar\wind\wind.go:34.36,36.2 1 1
+metar\wind\wind.go:38.63,41.59 2 1
+metar\wind\wind.go:44.2,46.25 3 1
+metar\wind\wind.go:51.2,52.22 2 1
+metar\wind\wind.go:55.2,55.22 1 1
+metar\wind\wind.go:59.2,59.24 1 1
+metar\wind\wind.go:67.2,67.22 1 1
+metar\wind\wind.go:72.2,72.26 1 1
+metar\wind\wind.go:41.59,43.3 1 1
+metar\wind\wind.go:46.25,48.3 1 1
+metar\wind\wind.go:48.8,50.3 1 1
+metar\wind\wind.go:52.22,54.3 1 1
+metar\wind\wind.go:55.22,57.3 1 1
+metar\wind\wind.go:59.24,62.3 2 1
+metar\wind\wind.go:62.8,62.55 1 1
+metar\wind\wind.go:62.55,65.3 2 1
+metar\wind\wind.go:67.22,71.3 3 1
