@@ -22,7 +22,7 @@ var parsetests = []parsetest{
 	{"240P49MPS", Wind{240, 49, 0, false, 0, 0, true}},
 	{"04008G20MPS", Wind{40, 8, 20, false, 0, 0, false}},
 	{"22003G08MPS 280V350", Wind{220, 3, 8, false, 280, 350, false}},
-	{"14010KT", Wind{140, 5.1440329218107, 0, false, 0, 0, false}},
+	{"14010KT", Wind{140, 5.144456333854638, 0, false, 0, 0, false}},
 	{"BKN020", Wind{0, 0, 0, false, 0, 0, false}},
 }
 
