@@ -12,6 +12,7 @@ var testsVisibility = []testpairRVR{
 	{"R33L/P1500", VisualRange{RunwayDesignator{"33L", false}, 1500, true, false, NotDefined}},
 	{"R16R/1000U", VisualRange{RunwayDesignator{"16R", false}, 1000, false, false, U}},
 	{"R33C/0900N", VisualRange{RunwayDesignator{"33C", false}, 900, false, false, N}},
+	{"OVC350", VisualRange{RunwayDesignator{"0", false}, 0, false, false, NotDefined}},
 }
 
 func TestParseVisibility(t *testing.T) {
@@ -43,6 +44,18 @@ var testsState = []testpairstate{
 		HeightOfCoverage:    12,
 		BrakingConditions:   93,
 	}},
+	{"R30/290250", State{Designator: RunwayDesignator{"30", false},
+		TypeOfCoverage:      2,
+		DimensionOfCoverage: 9,
+		HeightOfCoverage:    2,
+		BrakingConditions:   50,
+	}},
+	{"R21/0///65", State{Designator: RunwayDesignator{"21", false},
+		TypeOfCoverage:            0,
+		DimensionOfCoverageNotDef: true,
+		HeightOfCoverageNotDef:    true,
+		BrakingConditions:         65,
+	}},
 	{"R88///////", State{Designator: RunwayDesignator{"88", true},
 		TypeOfCoverageNotDef:        true,
 		DimensionOfCoverageNotDef:   true,
@@ -59,6 +72,7 @@ var testsState = []testpairstate{
 		BrakingConditions: 70,
 		CLRD:              true,
 	}},
+	{"OVC350", State{Designator: RunwayDesignator{"", false}}},
 }
 
 func TestParseState(t *testing.T) {

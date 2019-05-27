@@ -11,7 +11,7 @@ func KphToMps(kph float64) float64 {
 
 // converts knots to meters per second
 func KtsToMps(kts float64) float64 {
-	return kts / 1.944
+	return kts / 1.94384
 }
 
 // converts meters per second to knots
