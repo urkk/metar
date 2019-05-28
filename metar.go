@@ -15,7 +15,7 @@ import (
 	"github.com/urkk/metar/wind"
 )
 
-// By default read all messages in the current date. Can be redefined if necessary
+// Year, month and day. By default read all messages in the current date. Can be redefined if necessary
 var CurYearStr, CurMonthStr, CurDayStr string
 
 func init() {
@@ -25,7 +25,7 @@ func init() {
 	CurDayStr = fmt.Sprintf("%02d", now.Day())
 }
 
-// Meteorological report
+// MetarMessage - Meteorological report presented as a data structure
 type MetarMessage struct {
 	rawData  string    // The raw METAR
 	COR      bool      // Correction to observation
@@ -60,56 +60,21 @@ type MetarMessage struct {
 	NOSIG bool
 	// Remarks consisting of recent operationally significant weather as well as additive and automated maintenance data
 	Remarks *Remark
-
+	// An array of tokens that couldn't be decoded
 	NotDecodedTokens []string
 }
 
+// RAW - returns the original message text
 func (m *MetarMessage) RAW() string { return m.rawData }
 
+// NewMETAR - creates a new METAR based on the original message
 func NewMETAR(inputtext string) *MetarMessage {
+
 	m := &MetarMessage{
 		rawData: inputtext,
 	}
-	m.decodeMetar()
-	return m
-}
-
-type Visibility struct {
-	Distance       int
-	LowerDistance  int
-	LowerDirection string
-}
-
-type WindOnRWY struct {
-	Runway string
-	Wind   wind.Wind
-}
-
-type myRegexp struct {
-	*regexp.Regexp
-}
-
-func (r *myRegexp) FindStringSubmatchMap(s string) map[string]string {
-	captures := make(map[string]string)
-	match := r.FindStringSubmatch(s)
-	if match == nil {
-		return captures
-	}
-	for i, name := range r.SubexpNames() {
-		// Ignore the whole regexp match and unnamed groups
-		if i == 0 || name == "" {
-			continue
-		}
-		captures[name] = match[i]
-	}
-	return captures
-}
-
-func (m *MetarMessage) decodeMetar() {
-
 	headerRx := myRegexp{regexp.MustCompile(`^(?P<type>(METAR|SPECI)\s)?(?P<cor>COR\s)?(?P<station>\w{4})\s(?P<time>\d{6}Z)(?P<auto>\sAUTO)?(?P<nil>\sNIL)?`)}
-	headermap := headerRx.FindStringSubmatchMap(m.RAW())
-
+	headermap := headerRx.FindStringSubmatchMap(m.rawData)
 	m.Station = headermap["station"]
 	m.DateTime, _ = time.Parse("200601021504Z", CurYearStr+CurMonthStr+headermap["time"])
 	m.COR = headermap["cor"] != ""
@@ -117,13 +82,13 @@ func (m *MetarMessage) decodeMetar() {
 	m.NIL = headermap["nil"] != ""
 	if m.Station == "" && m.DateTime.IsZero() {
 		//not valid message?
-		m.NotDecodedTokens = append(m.NotDecodedTokens, m.RAW())
-		return
+		m.NotDecodedTokens = append(m.NotDecodedTokens, m.rawData)
+		return m
 	}
 	if m.NIL {
-		return
+		return m
 	}
-	tokens := strings.Split(m.RAW(), " ")
+	tokens := strings.Split(m.rawData, " ")
 
 	count := 0
 	totalcount := len(tokens)
@@ -147,9 +112,8 @@ func (m *MetarMessage) decodeMetar() {
 		}
 	}
 
-	for _, trend := range trends {
-		trend := parseTrendData(trend)
-		if trend != nil {
+	for _, trendstr := range trends {
+		if trend := parseTrendData(trendstr); trend != nil {
 			m.TREND = append(m.TREND, *trend)
 		}
 	}
@@ -157,33 +121,60 @@ func (m *MetarMessage) decodeMetar() {
 	if len(remarks) > 0 {
 		m.Remarks = parseRemarks(remarks)
 	}
+	m.decodeMetar(tokens[count:totalcount])
+	return m
+}
 
-	for count < totalcount {
+// Visibility - prevailing visibility
+type Visibility struct {
+	Distance       int
+	LowerDistance  int
+	LowerDirection string
+}
+
+type myRegexp struct {
+	*regexp.Regexp
+}
+
+func (r *myRegexp) FindStringSubmatchMap(s string) map[string]string {
+	captures := make(map[string]string)
+	match := r.FindStringSubmatch(s)
+	if match == nil {
+		return captures
+	}
+	for i, name := range r.SubexpNames() {
+		// Ignore the whole regexp match and unnamed groups
+		if i == 0 || name == "" {
+			continue
+		}
+		captures[name] = match[i]
+	}
+	return captures
+}
+
+func (m *MetarMessage) decodeMetar(tokens []string) {
+
+	var regex *regexp.Regexp
+	var matches []string
+	totalcount := len(tokens)
+	for count := 0; count < totalcount; {
 		// Surface wind
-		if wnd, ok, multiple := wind.ParseWind(strings.Join(tokens[count:], " ")); ok {
-			count++
+		if wnd, tokensused := wind.ParseWind(strings.Join(tokens[count:], " ")); tokensused > 0 {
 			m.Wind = wnd
-			if multiple {
-				count++
-			}
+			count += tokensused
+
 		}
 		if tokens[count] == "CAVOK" {
 			m.CAVOK = true
 			count++
-		}
-		var regex *regexp.Regexp
-		var matches []string
-		if !m.CAVOK {
+		} else {
 			// Horizontal visibility
-			if vis, ok, multiple := ParseVisibility(strings.Join(tokens[count:], " ")); ok {
-				count++
+			if vis, tokensused := ParseVisibility(strings.Join(tokens[count:], " ")); tokensused > 0 {
 				m.Visibility = vis
-				if multiple {
-					count++
-				}
+				count += tokensused
 			}
 			// Runway visual range
-			for i := count; i < len(tokens); i++ {
+			for count < totalcount {
 				if RWYvis, ok := rwy.ParseVisibility(tokens[count]); ok {
 					m.RWYvisibility = append(m.RWYvisibility, RWYvis)
 					count++
@@ -196,16 +187,14 @@ func (m *MetarMessage) decodeMetar() {
 				m.PhenomenaNotDefined = true
 				count++
 			}
-			for i := count; i < totalcount; i++ {
-				p := ph.ParsePhenomena(tokens[count])
-				if p != nil {
+			for count < totalcount {
+				if p := ph.ParsePhenomena(tokens[count]); p != nil {
 					m.Phenomena = append(m.Phenomena, *p)
 					count++
 				} else {
 					break // the end of the weather group
 				}
 			}
-
 			// Vertical visibility
 			regex = regexp.MustCompile(`VV(\d{3}|///)`)
 			matches = regex.FindStringSubmatch(tokens[count])
@@ -218,9 +207,8 @@ func (m *MetarMessage) decodeMetar() {
 					m.VerticalVisibilityNotDefined = true
 				}
 			}
-
 			// Cloudiness description
-			for i := count; i < totalcount; i++ {
+			for count < totalcount {
 				if cl, ok := clouds.ParseCloud(tokens[count]); ok {
 					m.Clouds = append(m.Clouds, cl)
 					count++
@@ -230,37 +218,17 @@ func (m *MetarMessage) decodeMetar() {
 			}
 		} //!CAVOK
 		// Temperature and dew point
-		regex = regexp.MustCompile(`^(M)?(\d{2})/(M)?(\d{2})$`)
-		matches = regex.FindStringSubmatch(tokens[count])
-		if len(matches) != 0 {
-			m.Temperature, _ = strconv.Atoi(matches[2])
-			m.Dewpoint, _ = strconv.Atoi(matches[4])
-			if matches[1] == "M" {
-				m.Temperature = -m.Temperature
-			}
-			if matches[3] == "M" {
-				m.Dewpoint = -m.Dewpoint
-			}
+		if m.checkTemp(tokens[count]) {
 			count++
 		}
-
 		// Altimeter setting
-		regex = regexp.MustCompile(`([Q|A])(\d{4})`)
-		matches = regex.FindStringSubmatch(tokens[count])
-		if len(matches) != 0 {
-			if matches[1] == "A" {
-				inHg, _ := strconv.ParseFloat(matches[2][:2]+"."+matches[2][2:4], 64)
-				m.QNHhPa = int(cnv.InHgTohPa(inHg))
-			} else {
-				m.QNHhPa, _ = strconv.Atoi(matches[2])
-			}
+		if m.checkAltimetr(tokens[count]) {
 			count++
 		}
 		//	All the following elements are optional
 		// Recent weather
-		for i := count; i < totalcount; i++ {
-			p := ph.ParseRecentPhenomena(tokens[count])
-			if p != nil {
+		for count < totalcount {
+			if p := ph.ParseRecentPhenomena(tokens[count]); p != nil {
 				m.RecentPhenomena = append(m.RecentPhenomena, *p)
 				count++
 			} else {
@@ -292,7 +260,7 @@ func (m *MetarMessage) decodeMetar() {
 			m.RWYState = append(m.RWYState, *rwc)
 			count++
 		}
-		for i := count; i < totalcount; i++ {
+		for count < totalcount {
 			if rwc, ok := rwy.ParseState(tokens[count]); ok {
 				m.RWYState = append(m.RWYState, rwc)
 				count++
@@ -312,19 +280,54 @@ func (m *MetarMessage) decodeMetar() {
 	} // End main section
 }
 
-func ParseVisibility(token string) (v Visibility, ok bool, multiple bool) {
+// ParseVisibility - identify and parses the representation oh horizontal visibility
+func ParseVisibility(token string) (v Visibility, tokensused int) {
 	// The literal P (M) is not listed in the documentation, but is used in messages
 	pattern := `^(P|M)?(\d{4})(\s|$)((\d{4})(NE|SE|NW|SW|N|E|S|W))?`
 	if matched, _ := regexp.MatchString(pattern, token); !matched {
-		return v, false, false
+		return v, tokensused
 	}
+	tokensused = 1
 	regex := regexp.MustCompile(pattern)
 	matches := regex.FindStringSubmatch(token)
 	v.Distance, _ = strconv.Atoi(matches[2])
 	if matches[4] != "" {
 		v.LowerDistance, _ = strconv.Atoi(matches[5])
 		v.LowerDirection = matches[6]
-		multiple = true
+		tokensused++
 	}
-	return v, true, multiple
+	return v, tokensused
+}
+
+// Checks whether the string is a temperature and dew point values and writes this values
+func (m *MetarMessage) checkTemp(input string) bool {
+	regex := regexp.MustCompile(`^(M)?(\d{2})/(M)?(\d{2})$`)
+	matches := regex.FindStringSubmatch(input)
+	if len(matches) != 0 {
+		m.Temperature, _ = strconv.Atoi(matches[2])
+		m.Dewpoint, _ = strconv.Atoi(matches[4])
+		if matches[1] == "M" {
+			m.Temperature = -m.Temperature
+		}
+		if matches[3] == "M" {
+			m.Dewpoint = -m.Dewpoint
+		}
+		return true
+	}
+	return false
+}
+
+func (m *MetarMessage) checkAltimetr(input string) bool {
+	regex := regexp.MustCompile(`([Q|A])(\d{4})`)
+	matches := regex.FindStringSubmatch(input)
+	if len(matches) != 0 {
+		if matches[1] == "A" {
+			inHg, _ := strconv.ParseFloat(matches[2][:2]+"."+matches[2][2:4], 64)
+			m.QNHhPa = int(cnv.InHgTohPa(inHg))
+		} else {
+			m.QNHhPa, _ = strconv.Atoi(matches[2])
+		}
+		return true
+	}
+	return false
 }

@@ -18,7 +18,7 @@ var curDay = time.Now().Day()
 type visibilityparsetest struct {
 	input    string
 	expected Visibility
-	multiple bool
+	tokens   int
 }
 
 var visibilityparsetests = []visibilityparsetest{
@@ -26,17 +26,17 @@ var visibilityparsetests = []visibilityparsetest{
 	// LowerDistance  int
 	// LowerDirection string
 
-	{"2000", Visibility{2000, 0, ""}, false},
-	{"3000 1500NE", Visibility{3000, 1500, "NE"}, true},
-	{"1500 1000S", Visibility{1500, 1000, "S"}, true},
-	{"9999", Visibility{9999, 0, ""}, false},
-	{"20008MPS", Visibility{0, 0, ""}, false},
+	{"2000", Visibility{2000, 0, ""}, 1},
+	{"3000 1500NE", Visibility{3000, 1500, "NE"}, 2},
+	{"1500 1000S", Visibility{1500, 1000, "S"}, 2},
+	{"9999", Visibility{9999, 0, ""}, 1},
+	{"20008MPS", Visibility{0, 0, ""}, 0},
 }
 
 func TestParseVisibility(t *testing.T) {
 	for _, pair := range visibilityparsetests {
-		v, ok, multiple := ParseVisibility(pair.input)
-		if ok && v != pair.expected || multiple != pair.multiple {
+		v, tokensused := ParseVisibility(pair.input)
+		if tokensused > 0 && v != pair.expected || tokensused != pair.tokens {
 			t.Error(
 				"For", pair.input,
 				"expected", pair.expected,
@@ -52,7 +52,7 @@ type remarksparsetest struct {
 }
 
 func getWind(inp string) wind.Wind {
-	w, _, _ := wind.ParseWind(inp)
+	w, _ := wind.ParseWind(inp)
 	return w
 }
 
@@ -156,8 +156,8 @@ var metarparsetests = []metarparsetest{
 			Remarks:          &Remark{QFE: 748},
 			NotDecodedTokens: []string{"END"},
 		}},
-	{"METAR URSS 270600Z 22003MPS 180V250 5000 4000NW R24/P2000 // VV100 M17/M11 A3006 RESN WS ALL RWY",
-		&MetarMessage{rawData: "METAR URSS 270600Z 22003MPS 180V250 5000 4000NW R24/P2000 // VV100 M17/M11 A3006 RESN WS ALL RWY",
+	{"METAR URSS 270600Z 22003MPS 180V250 5000 4000NW R24/P2000 R30/6000 // VV100 M17/M11 A3006 RESN WS ALL RWY",
+		&MetarMessage{rawData: "METAR URSS 270600Z 22003MPS 180V250 5000 4000NW R24/P2000 R30/6000 // VV100 M17/M11 A3006 RESN WS ALL RWY",
 			Station:    "URSS",
 			DateTime:   time.Date(curYear, curMonth, 27, 6, 0, 0, 0, time.UTC),
 			Wind:       getWind("22003MPS 180V250"),
@@ -165,7 +165,12 @@ var metarparsetests = []metarparsetest{
 			RWYvisibility: []runways.VisualRange{runways.VisualRange{Designator: runways.RunwayDesignator{Number: "24", AllRunways: false},
 				Distance: 2000,
 				AboveMax: true,
-				Trend:    ""}},
+				Trend:    ""},
+				runways.VisualRange{Designator: runways.RunwayDesignator{Number: "30", AllRunways: false},
+					Distance: 6000,
+					AboveMax: false,
+					Trend:    ""},
+			},
 			PhenomenaNotDefined: true,
 			VerticalVisibility:  10000,
 			Temperature:         -17,
@@ -178,8 +183,8 @@ var metarparsetests = []metarparsetest{
 		&MetarMessage{rawData: "TAF UUWW 121350Z 1215/1315 VRB01MPS 9999 SCT040 TX22/1215Z TN13/1302Z TEMPO 1221/1315 3100 -SHRA FEW007 BKN011CB",
 			NotDecodedTokens: []string{"TAF UUWW 121350Z 1215/1315 VRB01MPS 9999 SCT040 TX22/1215Z TN13/1302Z TEMPO 1221/1315 3100 -SHRA FEW007 BKN011CB"},
 		}},
-	{"COR UHMM 240700Z 11006MPS 9999 -SHRA SCT011 OVC018CB 05/04 Q1002",
-		&MetarMessage{rawData: "COR UHMM 240700Z 11006MPS 9999 -SHRA SCT011 OVC018CB 05/04 Q1002",
+	{"COR UHMM 240700Z 11006MPS 9999 -SHRA SCT011 OVC018CB 05/04 Q1002 RMK R01/18004MPS",
+		&MetarMessage{rawData: "COR UHMM 240700Z 11006MPS 9999 -SHRA SCT011 OVC018CB 05/04 Q1002 RMK R01/18004MPS",
 			COR:         true,
 			Station:     "UHMM",
 			DateTime:    time.Date(curYear, curMonth, 24, 7, 0, 0, 0, time.UTC),
@@ -190,6 +195,7 @@ var metarparsetests = []metarparsetest{
 			Dewpoint:    4,
 			QNHhPa:      1002,
 			Phenomena:   []phenomena.Phenomena{phenomena.Phenomena{Vicinity: false, Abbreviation: "SHRA", Intensity: "-"}},
+			Remarks:     &Remark{WindOnRWY: []WindOnRWY{WindOnRWY{Runway: "01", Wind: getWind("18004MPS")}}},
 		}},
 	{"METAR UOOO 052030Z NIL",
 		&MetarMessage{rawData: "METAR UOOO 052030Z NIL",
@@ -202,7 +208,7 @@ var metarparsetests = []metarparsetest{
 func TestDecode(t *testing.T) {
 	for _, pair := range metarparsetests {
 		msg := NewMETAR(pair.input)
-		if !reflect.DeepEqual(msg, pair.expected) {
+		if !reflect.DeepEqual(msg, pair.expected) || msg.RAW() != pair.input {
 			t.Error(
 				"For", pair.input,
 				"expected", pair.expected,

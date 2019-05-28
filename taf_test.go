@@ -133,13 +133,18 @@ var tafparsetests = []tafparsetest{
 			COR: false, AMD: false, NIL: true, Station: "UHMD", CNL: false,
 			DateTime: time.Date(curYear, curMonth, 22, 14, 0, 0, 0, time.UTC),
 		}},
+	// not valid message - no date/time of issue
+	{"TAF UEEE 2803/2909 32003G10MPS 9999 BKN030CB OVC070 TEMPO 2803/2812 VRB14MPS 3200 -TSRA",
+		&TAFMessage{rawData: "TAF UEEE 2803/2909 32003G10MPS 9999 BKN030CB OVC070 TEMPO 2803/2812 VRB14MPS 3200 -TSRA",
+			NotDecodedTokens: []string{"TAF UEEE 2803/2909 32003G10MPS 9999 BKN030CB OVC070 TEMPO 2803/2812 VRB14MPS 3200 -TSRA"},
+		}},
 }
 
 func TestDecodeTAF(t *testing.T) {
 
 	for _, pair := range tafparsetests {
 		taf := NewTAF(pair.input)
-		if !reflect.DeepEqual(taf, pair.expected) {
+		if !reflect.DeepEqual(taf, pair.expected) || pair.input != taf.RAW() {
 			t.Error(
 				"For", pair.input,
 				"expected", pair.expected,

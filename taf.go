@@ -11,6 +11,7 @@ import (
 	"github.com/urkk/metar/wind"
 )
 
+// TemperatureForecast - Forecast Max and Min temperature
 type TemperatureForecast struct {
 	Temp     int
 	DateTime time.Time
@@ -18,7 +19,7 @@ type TemperatureForecast struct {
 	IsMin    bool
 }
 
-// Terminal Aerodrome Forecast
+// TAFMessage - Terminal Aerodrome Forecast struct
 type TAFMessage struct {
 	rawData   string    // The raw TAF
 	COR       bool      // Correction of forecast due to a typo
@@ -45,28 +46,26 @@ type TAFMessage struct {
 	NotDecodedTokens []string
 }
 
+// NewTAF - creates a new TAF forecast based on the original message
 func NewTAF(inputtext string) *TAFMessage {
 	t := &TAFMessage{
 		rawData: inputtext,
 	}
-	t.decodeTAF()
-	return t
-}
-func (t *TAFMessage) RAW() string { return t.rawData }
-
-func (t *TAFMessage) decodeTAF() {
-
 	headerRx := myRegexp{regexp.MustCompile(`^(?P<taf>TAF\s)?(?P<cor>COR\s)?(?P<amd>AMD\s)?(?P<station>\w{4})\s(?P<time>\d{6}Z)(?P<nil>\sNIL)?(\s(?P<from>\d{4})/(?P<to>\d{4}))?(?P<cnl>\sCNL)?`)}
-	headermap := headerRx.FindStringSubmatchMap(t.RAW())
+	headermap := headerRx.FindStringSubmatchMap(t.rawData)
 	t.Station = headermap["station"]
 	t.DateTime, _ = time.Parse("200601021504Z", CurYearStr+CurMonthStr+headermap["time"])
 	t.COR = headermap["cor"] != ""
 	t.AMD = headermap["amd"] != ""
 	t.NIL = headermap["nil"] != ""
 	t.CNL = headermap["cnl"] != ""
-
+	if t.Station == "" && t.DateTime.IsZero() {
+		//not valid message?
+		t.NotDecodedTokens = append(t.NotDecodedTokens, t.rawData)
+		return t
+	}
 	if t.NIL { // End of TAF, if the forecast is lost
-		return
+		return t
 	}
 	t.ValidFrom, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+headermap["from"])
 	// hours maybe 24
@@ -77,27 +76,18 @@ func (t *TAFMessage) decodeTAF() {
 		t.ValidTo, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+headermap["to"])
 	}
 
-	//	forecast for next month
-	if t.ValidFrom.Day() < t.DateTime.Day() {
-		t.ValidFrom = t.ValidFrom.AddDate(0, 1, 0)
-	}
-	if t.ValidTo.Day() < t.DateTime.Day() {
-		t.ValidTo = t.ValidTo.AddDate(0, 1, 0)
-	}
+	t.checkTimeShift()
+
 	if t.CNL { // End of TAF, if the forecast is cancelled
-		return
+		return t
 	}
-	tokens := strings.Split(t.RAW(), " ")
+	tokens := strings.Split(t.rawData, " ")
 
 	count := 0
-	for _, value := range headermap {
-		if value != "" {
+	for key, value := range headermap {
+		if value != "" && key != "to" { // field "from" and "to" - it's one token (DDhh/DDhh), and they are mandatory.
 			count++
 		}
-	}
-	// field "from" and "to" - it's one token (DDhh/DDhh), and they are mandatory. step back.
-	if count > 3 { // station id, issued, valid from, valid to
-		count--
 	}
 
 	var trends [][]string
@@ -112,38 +102,44 @@ func (t *TAFMessage) decodeTAF() {
 			totalcount = i
 		}
 	}
-
-	for _, trend := range trends {
-		trend := parseTrendData(trend)
-		if trend != nil {
+	for _, trendstr := range trends {
+		if trend := parseTrendData(trendstr); trend != nil {
 			t.TREND = append(t.TREND, *trend)
 		}
 	}
+	t.decodeTAF(tokens[count:totalcount])
+	return t
+}
 
-	for count < totalcount {
+// RAW - returns the original message text
+func (t *TAFMessage) RAW() string { return t.rawData }
+
+func (t *TAFMessage) decodeTAF(tokens []string) {
+
+	totalcount := len(tokens)
+	var regex *regexp.Regexp
+	var matches []string
+
+	for count := 0; count < totalcount; {
 		// Wind - Visibility - Weather - Sky Condition
 
 		// Surface wind
-		if wnd, ok, _ := wind.ParseWind(tokens[count]); ok {
+		if wnd, tokensused := wind.ParseWind(tokens[count]); tokensused > 0 {
 			t.Wind = wnd
-			count++
+			count += tokensused
 		}
 		if tokens[count] == "CAVOK" {
 			t.CAVOK = true
 			count++
-		}
-		var regex *regexp.Regexp
-		var matches []string
-		if !t.CAVOK {
+		} else {
 			// Horizontal visibility
-			if vis, ok, _ := ParseVisibility(tokens[count]); ok {
+			if vis, tokensused := ParseVisibility(tokens[count]); tokensused > 0 {
 				t.Visibility = vis
-				count++
+				count += tokensused
 			}
 			// Weather
 			for i := count; i < len(tokens); i++ {
-				p := ph.ParsePhenomena(tokens[count])
-				if p != nil {
+				if p := ph.ParsePhenomena(tokens[count]); p != nil {
 					t.Phenomena = append(t.Phenomena, *p)
 					count++
 				} else {
@@ -153,11 +149,9 @@ func (t *TAFMessage) decodeTAF() {
 			// Vertical visibility
 			regex = regexp.MustCompile(`VV(\d{3})`)
 			matches = regex.FindStringSubmatch(tokens[count])
-			if len(matches) != 0 && matches[0] != "" {
+			if len(matches) != 0 && matches[1] != "" {
+				t.VerticalVisibility, _ = strconv.Atoi(matches[1])
 				count++
-				if matches[1] != "" {
-					t.VerticalVisibility, _ = strconv.Atoi(matches[1])
-				}
 			}
 			// Cloudiness description
 			for i := count; i < len(tokens); i++ {
@@ -176,18 +170,7 @@ func (t *TAFMessage) decodeTAF() {
 		regex = regexp.MustCompile(`^T(X|N)(M)?(\d\d)\/(\d{4}Z)`)
 		matches = regex.FindStringSubmatch(tokens[count])
 		for ; len(matches) > 0; matches = regex.FindStringSubmatch(tokens[count]) {
-			tempf := new(TemperatureForecast)
-			tempf.Temp, _ = strconv.Atoi(matches[3])
-			if matches[2] == "M" {
-				tempf.Temp = -tempf.Temp
-			}
-			if matches[1] == "N" {
-				tempf.IsMin = true
-			} else {
-				tempf.IsMax = true
-			}
-			tempf.DateTime, _ = time.Parse("2006010215Z", time.Now().Format("200601")+matches[4])
-			t.Temperature = append(t.Temperature, *tempf)
+			t.writeTempForecast(matches)
 			count++
 			if count >= len(tokens) {
 				break
@@ -199,4 +182,27 @@ func (t *TAFMessage) decodeTAF() {
 			count++
 		}
 	} // End main section
+}
+
+func (t *TAFMessage) writeTempForecast(matches []string) {
+	tempf := new(TemperatureForecast)
+	tempf.Temp, _ = strconv.Atoi(matches[3])
+	if matches[2] == "M" {
+		tempf.Temp = -tempf.Temp
+	}
+	tempf.IsMin = matches[1] == "N"
+	tempf.IsMax = matches[1] == "X"
+	// TODO check for date at next month
+	tempf.DateTime, _ = time.Parse("2006010215Z", CurYearStr+CurMonthStr+matches[4])
+	t.Temperature = append(t.Temperature, *tempf)
+}
+
+func (t *TAFMessage) checkTimeShift() {
+	//	forecast for next month
+	if t.ValidFrom.Day() < t.DateTime.Day() {
+		t.ValidFrom = t.ValidFrom.AddDate(0, 1, 0)
+	}
+	if t.ValidTo.Day() < t.DateTime.Day() {
+		t.ValidTo = t.ValidTo.AddDate(0, 1, 0)
+	}
 }

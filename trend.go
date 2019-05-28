@@ -11,14 +11,19 @@ import (
 	"github.com/urkk/metar/wind"
 )
 
+// TypeTrend - type of trend: temporary or permanently expected changes
 type TypeTrend string
 
 const (
-	BECMG = "BECMG" // Weather development (BECoMinG)
-	TEMPO = "TEMPO" // TEMPOrary existing weather phenomena
-	FM    = "FM"    // in TAF reports
+	// BECMG - Weather development (BECoMinG)
+	BECMG = "BECMG"
+	// TEMPO - TEMPOrary existing weather phenomena
+	TEMPO = "TEMPO"
+	// FM - FroM (in TAF reports)
+	FM = "FM"
 )
 
+// Trend - forecast of changes for a specified period
 type Trend struct {
 	Type        TypeTrend
 	Probability int // used only in TAFs. Maybe only 30 or 40. The PROBdd group is not used in conjunction with BECMG and FM
@@ -71,78 +76,84 @@ func parseTrendData(tokens []string) (trend *Trend) {
 			index++
 		}
 		// date/time for TAF
-		regex := regexp.MustCompile(`^(\d{4})/(\d{4})`)
-		matches := regex.FindStringSubmatch(tokens[index])
-		if len(matches) != 0 && matches[0] != "" {
-			// hours maybe 24
-			starttime := matches[1]
-			endtime := matches[2]
-			if starttime[2:] == "24" {
-				starttime = starttime[:2] + "23"
-				trend.FM, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+starttime)
-				trend.FM = trend.FM.Add(time.Hour)
-			} else {
-				trend.FM, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+starttime)
-			}
-			if endtime[2:] == "24" {
-				endtime = endtime[:2] + "23"
-				trend.TL, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+endtime)
-				trend.TL = trend.TL.Add(time.Hour)
-			} else {
-				trend.TL, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+endtime)
-			}
+		if trend.checkDateTime(tokens[index]) {
 			index++
 		}
 		// Wind. Only the prevailing direction.
-		if wnd, ok, _ := wind.ParseWind(tokens[index]); ok {
-			index++
+		if wnd, tokensused := wind.ParseWind(tokens[index]); tokensused > 0 {
+			index += tokensused
 			trend.Wind = wnd
 		}
 		if index < len(tokens) && tokens[index] == "CAVOK" {
 			trend.CAVOK = true
-			index++
 			return trend
-		}
-		if index >= len(tokens) {
-			return trend
-		}
-		// Horizontal visibility. The distance and direction of the least visibility is not predicted
-		if vis, ok, _ := ParseVisibility(strings.Join(tokens[index:], " ")); ok {
-			index++
-			trend.Visibility = vis
-		}
-		// Weather or NSW - no significant weather
-		for i := index; i < len(tokens); i++ {
-			p := ph.ParsePhenomena(tokens[index])
-			if p != nil {
-				trend.Phenomena = append(trend.Phenomena, *p)
-				index++
-			} else {
-				break
+		} else {
+			// Horizontal visibility. The distance and direction of the least visibility is not predicted
+			if vis, tokensused := ParseVisibility(strings.Join(tokens[index:], " ")); tokensused > 0 {
+				trend.Visibility = vis
+				index += tokensused
 			}
-		}
-		// Vertical visibility
-		if index < len(tokens) {
-			regex := regexp.MustCompile(`^VV(\d{3}|///)`)
-			matches := regex.FindStringSubmatch(tokens[index])
-			if len(matches) != 0 && matches[0] != "" {
-				if matches[1] != "///" {
-					trend.VerticalVisibility, _ = strconv.Atoi(matches[1])
-					trend.VerticalVisibility *= 100
+			// Weather or NSW - no significant weather
+			for index < len(tokens) {
+				if p := ph.ParsePhenomena(tokens[index]); p != nil {
+					trend.Phenomena = append(trend.Phenomena, *p)
+					index++
 				} else {
-					trend.VerticalVisibilityNotDefined = true
+					break
 				}
-				index++
 			}
-		}
-		// Clouds. No further information after the clouds in trend
-		for i := index; i < len(tokens); i++ {
-			if cl, ok := clouds.ParseCloud(tokens[index]); ok {
-				trend.Clouds = append(trend.Clouds, cl)
-				index++
+			// Vertical visibility
+			if index < len(tokens) {
+				regex := regexp.MustCompile(`^VV(\d{3}|///)`)
+				matches := regex.FindStringSubmatch(tokens[index])
+				if len(matches) != 0 && matches[0] != "" {
+					if matches[1] != "///" {
+						trend.VerticalVisibility, _ = strconv.Atoi(matches[1])
+						trend.VerticalVisibility *= 100
+					} else {
+						trend.VerticalVisibilityNotDefined = true
+					}
+					index++
+				}
+			}
+			// Clouds. No further information after the clouds in trend
+			for index < len(tokens) {
+				if cl, ok := clouds.ParseCloud(tokens[index]); ok {
+					trend.Clouds = append(trend.Clouds, cl)
+					index++
+				} else {
+					break
+				}
 			}
 		}
 		index++
 	}
 	return trend
+}
+
+func (trend *Trend) checkDateTime(input string) bool {
+
+	regex := regexp.MustCompile(`^(\d{4})/(\d{4})`)
+	matches := regex.FindStringSubmatch(input)
+	if len(matches) != 0 && matches[0] != "" {
+		starttime := matches[1]
+		endtime := matches[2]
+		// hours maybe 24
+		if starttime[2:] == "24" {
+			starttime = starttime[:2] + "23"
+			trend.FM, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+starttime)
+			trend.FM = trend.FM.Add(time.Hour)
+		} else {
+			trend.FM, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+starttime)
+		}
+		if endtime[2:] == "24" {
+			endtime = endtime[:2] + "23"
+			trend.TL, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+endtime)
+			trend.TL = trend.TL.Add(time.Hour)
+		} else {
+			trend.TL, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+endtime)
+		}
+		return true
+	}
+	return false
 }

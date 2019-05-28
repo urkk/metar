@@ -45,8 +45,8 @@ var functests = []functest{
 
 func TestParseWind(t *testing.T) {
 	for _, pair := range parsetests {
-		v, ok, _ := ParseWind(pair.input)
-		if ok && v != pair.expected {
+		v, tokensused := ParseWind(pair.input)
+		if tokensused > 0 && v != pair.expected {
 			t.Error(
 				"For", pair.input,
 				"expected", pair.expected,
