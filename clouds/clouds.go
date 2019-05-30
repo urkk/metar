@@ -2,7 +2,7 @@
 package clouds
 
 import (
-	cnv "metar/conversion"
+	cnv "github.com/urkk/metar/conversion"
 	"regexp"
 	"strconv"
 )
