@@ -76,7 +76,7 @@ func NewTAF(inputtext string) *TAFMessage {
 	position := 0
 	for key, value := range headermap {
 		if value != "" && key != "to" { // field "from" and "to" - it's one token (DDhh/DDhh), and they are mandatory.
-			count++
+			position++
 		}
 	}
 	endposition := t.findTrendsInMessage(tokens, position)
