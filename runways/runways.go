@@ -6,20 +6,23 @@ import (
 	"strconv"
 )
 
+// VRTendency - average runway visual range tendency
 type VRTendency string
 
 const (
-	NotDefined = ""
+	NotDefined = ""  //no changes are reported
 	U          = "U" //upward
 	N          = "N" //no distinct
 	D          = "D" //downward
 )
 
+// RunwayDesignator - two-digit runway number
 type RunwayDesignator struct {
 	Number     string
 	AllRunways bool
 }
 
+// NewRD - construct new runway designator
 func NewRD(number string) (rd RunwayDesignator) {
 	pattern := `^(R)?(\d{2})[LCR]?`
 	regex := regexp.MustCompile(pattern)
@@ -35,6 +38,7 @@ func NewRD(number string) (rd RunwayDesignator) {
 	return rd
 }
 
+// VisualRange - describes the horizontal distance you can expect to see down a runway
 type VisualRange struct {
 	Designator RunwayDesignator
 	Distance   int
@@ -43,6 +47,7 @@ type VisualRange struct {
 	Trend      VRTendency
 }
 
+// State - runway condition representation
 type State struct {
 	Designator                RunwayDesignator
 	TypeOfCoverage            int
@@ -58,6 +63,7 @@ type State struct {
 	SNOCLO                      bool
 }
 
+// ParseVisibility - identify and parses the representation of runway visual range
 func ParseVisibility(token string) (v VisualRange, result bool) {
 	// TODO 0800V1000FT			R27/0150V0300U
 	pattern := `^(R\d{2}[LCR]?)/(M|P)?(\d{4})(U|D|N)?`
@@ -74,6 +80,7 @@ func ParseVisibility(token string) (v VisualRange, result bool) {
 	return v, true
 }
 
+// ParseState - identify and parses the representation of runway condition
 func ParseState(token string) (s State, result bool) {
 
 	pattern := `^(R\d{2}[LCR]?)/((\d|\/)(\d|\/)(\d\d|\/\/)|CLRD)?(\d\d|\/\/)(D)?$`

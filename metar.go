@@ -100,6 +100,7 @@ func NewMETAR(inputtext string) *MetarMessage {
 
 	var trends [][]string
 	var remarks []string
+	// split the array of tokens to parts: main section, remarks and trends
 	for i := totalcount - 1; i > count; i-- {
 		if tokens[i] == "RMK" {
 			remarks = append(remarks, tokens[i:totalcount]...)
@@ -162,7 +163,6 @@ func (m *MetarMessage) decodeMetar(tokens []string) {
 		if wnd, tokensused := wind.ParseWind(strings.Join(tokens[count:], " ")); tokensused > 0 {
 			m.Wind = wnd
 			count += tokensused
-
 		}
 		if tokens[count] == "CAVOK" {
 			m.CAVOK = true
@@ -174,68 +174,37 @@ func (m *MetarMessage) decodeMetar(tokens []string) {
 				count += tokensused
 			}
 			// Runway visual range
-			for count < totalcount {
-				if RWYvis, ok := rwy.ParseVisibility(tokens[count]); ok {
-					m.RWYvisibility = append(m.RWYvisibility, RWYvis)
-					count++
-				} else {
-					break
-				}
+			for count < totalcount && m.appendRunwayVisualRange(tokens[count]) {
+				count++
 			}
 			// Present Weather
-			if tokens[count] == "//" {
-				m.PhenomenaNotDefined = true
+			for count < totalcount && m.appendPhenomena(tokens[count]) {
 				count++
-			}
-			for count < totalcount {
-				if p := ph.ParsePhenomena(tokens[count]); p != nil {
-					m.Phenomena = append(m.Phenomena, *p)
-					count++
-				} else {
-					break // the end of the weather group
-				}
 			}
 			// Vertical visibility
-			regex = regexp.MustCompile(`VV(\d{3}|///)`)
-			matches = regex.FindStringSubmatch(tokens[count])
-			if len(matches) != 0 && matches[0] != "" {
+			if m.setVerticalVisibility(tokens[count]) {
 				count++
-				if matches[1] != "///" {
-					m.VerticalVisibility, _ = strconv.Atoi(matches[1])
-					m.VerticalVisibility *= 100
-				} else {
-					m.VerticalVisibilityNotDefined = true
-				}
 			}
 			// Cloudiness description
-			for count < totalcount {
-				if cl, ok := clouds.ParseCloud(tokens[count]); ok {
-					m.Clouds = append(m.Clouds, cl)
-					count++
-				} else {
-					break
-				}
+			for count < totalcount && m.appendCloud(tokens[count]) {
+				count++
 			}
-		} //!CAVOK
+		} //end !CAVOK
 		// Temperature and dew point
-		if m.checkTemp(tokens[count]) {
+		if m.setTemperature(tokens[count]) {
 			count++
 		}
 		// Altimeter setting
-		if m.checkAltimetr(tokens[count]) {
+		if m.setAltimetr(tokens[count]) {
 			count++
 		}
 		//	All the following elements are optional
 		// Recent weather
-		for count < totalcount {
-			if p := ph.ParseRecentPhenomena(tokens[count]); p != nil {
-				m.RecentPhenomena = append(m.RecentPhenomena, *p)
-				count++
-			} else {
-				break // the end of the weather group
-			}
+		for count < totalcount && m.appendRecentPhenomena(tokens[count]) {
+			count++
 		}
 		// Wind shear
+		//TODO переделать на функцию
 		regex = regexp.MustCompile(`^WS\s((R\d{2}[LCR]?)|(ALL\sRWY))`)
 		matches = regex.FindStringSubmatch(strings.Join(tokens[count:], " "))
 		for ; len(matches) > 0; matches = regex.FindStringSubmatch(strings.Join(tokens[count:], " ")) {
@@ -254,19 +223,8 @@ func (m *MetarMessage) decodeMetar(tokens []string) {
 		// W19/S4  W15/Н7  W15/Н17 W15/Н175
 
 		// State of the runway(s)
-		if count < totalcount && tokens[count] == "R/SNOCLO" {
-			rwc := new(rwy.State)
-			rwc.SNOCLO = true
-			m.RWYState = append(m.RWYState, *rwc)
+		for count < totalcount && m.appendRunwayState(tokens[count]) {
 			count++
-		}
-		for count < totalcount {
-			if rwc, ok := rwy.ParseState(tokens[count]); ok {
-				m.RWYState = append(m.RWYState, rwc)
-				count++
-			} else {
-				break
-			}
 		}
 		if count < totalcount && tokens[count] == "NOSIG" {
 			m.NOSIG = true
@@ -300,7 +258,7 @@ func ParseVisibility(token string) (v Visibility, tokensused int) {
 }
 
 // Checks whether the string is a temperature and dew point values and writes this values
-func (m *MetarMessage) checkTemp(input string) bool {
+func (m *MetarMessage) setTemperature(input string) bool {
 	regex := regexp.MustCompile(`^(M)?(\d{2})/(M)?(\d{2})$`)
 	matches := regex.FindStringSubmatch(input)
 	if len(matches) != 0 {
@@ -317,7 +275,7 @@ func (m *MetarMessage) checkTemp(input string) bool {
 	return false
 }
 
-func (m *MetarMessage) checkAltimetr(input string) bool {
+func (m *MetarMessage) setAltimetr(input string) bool {
 	regex := regexp.MustCompile(`([Q|A])(\d{4})`)
 	matches := regex.FindStringSubmatch(input)
 	if len(matches) != 0 {
@@ -327,6 +285,75 @@ func (m *MetarMessage) checkAltimetr(input string) bool {
 		} else {
 			m.QNHhPa, _ = strconv.Atoi(matches[2])
 		}
+		return true
+	}
+	return false
+}
+
+func (m *MetarMessage) appendRunwayVisualRange(input string) bool {
+	if RWYvis, ok := rwy.ParseVisibility(input); ok {
+		m.RWYvisibility = append(m.RWYvisibility, RWYvis)
+		return true
+	}
+	return false
+}
+
+func (m *MetarMessage) appendPhenomena(input string) bool {
+	if input == "//" {
+		m.PhenomenaNotDefined = true
+		return true
+	}
+	if p := ph.ParsePhenomena(input); p != nil {
+		m.Phenomena = append(m.Phenomena, *p)
+		return true
+	}
+	return false
+}
+
+func (m *MetarMessage) appendCloud(input string) bool {
+
+	if cl, ok := clouds.ParseCloud(input); ok {
+		m.Clouds = append(m.Clouds, cl)
+		return true
+	}
+	return false
+}
+
+func (m *MetarMessage) appendRecentPhenomena(input string) bool {
+
+	if p := ph.ParseRecentPhenomena(input); p != nil {
+		m.RecentPhenomena = append(m.RecentPhenomena, *p)
+		return true
+	}
+	return false
+}
+
+func (m *MetarMessage) setVerticalVisibility(input string) bool {
+
+	regex := regexp.MustCompile(`VV(\d{3}|///)`)
+	matches := regex.FindStringSubmatch(input)
+	if len(matches) != 0 && matches[0] != "" {
+		if matches[1] != "///" {
+			m.VerticalVisibility, _ = strconv.Atoi(matches[1])
+			m.VerticalVisibility *= 100
+		} else {
+			m.VerticalVisibilityNotDefined = true
+		}
+		return true
+	}
+	return false
+}
+
+func (m *MetarMessage) appendRunwayState(input string) bool {
+
+	if input == "R/SNOCLO" {
+		rwc := new(rwy.State)
+		rwc.SNOCLO = true
+		m.RWYState = append(m.RWYState, *rwc)
+		return true
+	}
+	if rwc, ok := rwy.ParseState(input); ok {
+		m.RWYState = append(m.RWYState, rwc)
 		return true
 	}
 	return false

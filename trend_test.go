@@ -73,6 +73,26 @@ var trendparsetests = []trendparsetest{
 			Wind: getWind("09003G08MPS"),
 		},
 	},
+	{[]string{"BECMG", "FM2200", "TL2400", "BKN015//"},
+		Trend{Type: BECMG,
+			FM:     time.Date(curYear, curMonth, curDay, 22, 0, 0, 0, time.UTC),
+			TL:     time.Date(curYear, curMonth, curDay+1, 00, 0, 0, 0, time.UTC),
+			Clouds: []clouds.Cloud{getCloud("BKN015//")},
+		},
+	},
+	// misspelled time
+	{[]string{"BECMG", "FM220O", "TL23O0", "BKN015//"},
+		Trend{Type: BECMG,
+			Clouds: []clouds.Cloud{getCloud("BKN015//")},
+		},
+	},
+	// misspelled time
+	{[]string{"BECMG", "AT220O", "TL2300", "BKN015//"},
+		Trend{Type: BECMG,
+			TL:     time.Date(curYear, curMonth, curDay, 23, 0, 0, 0, time.UTC),
+			Clouds: []clouds.Cloud{getCloud("BKN015//")},
+		},
+	},
 }
 
 func TestParseTrendData(t *testing.T) {

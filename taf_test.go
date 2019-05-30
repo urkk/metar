@@ -95,7 +95,7 @@ var tafparsetests = []tafparsetest{
 			ValidFrom:          time.Date(curYear, curMonth+1, 1, 0, 0, 0, 0, time.UTC),
 			ValidTo:            time.Date(curYear, curMonth+1, 2, 0, 0, 0, 0, time.UTC),
 			Visibility:         Visibility{Distance: 3000, LowerDistance: 0, LowerDirection: ""},
-			VerticalVisibility: 50,
+			VerticalVisibility: 5000,
 			Wind:               getWind("02003MPS"),
 			TREND: []Trend{Trend{Type: FM,
 				Wind: getWind("18005MPS"),
@@ -138,6 +138,19 @@ var tafparsetests = []tafparsetest{
 		&TAFMessage{rawData: "TAF UEEE 2803/2909 32003G10MPS 9999 BKN030CB OVC070 TEMPO 2803/2812 VRB14MPS 3200 -TSRA",
 			NotDecodedTokens: []string{"TAF UEEE 2803/2909 32003G10MPS 9999 BKN030CB OVC070 TEMPO 2803/2812 VRB14MPS 3200 -TSRA"},
 		}},
+	{"TAF UUEE 300454Z 3006/0106 20005G11MPS 9999 SCT030 TX29/3012Z TN16/0102Z",
+		&TAFMessage{rawData: "TAF UUEE 300454Z 3006/0106 20005G11MPS 9999 SCT030 TX29/3012Z TN16/0102Z",
+			COR: false, AMD: false, NIL: false, Station: "UUEE",
+			DateTime:   time.Date(curYear, curMonth, 30, 4, 54, 0, 0, time.UTC),
+			ValidFrom:  time.Date(curYear, curMonth, 30, 6, 0, 0, 0, time.UTC),
+			ValidTo:    time.Date(curYear, curMonth+1, 1, 6, 0, 0, 0, time.UTC),
+			Visibility: Visibility{Distance: 9999, LowerDistance: 0, LowerDirection: ""},
+			Wind:       getWind("20005G11MPS"),
+			Clouds:     []clouds.Cloud{getCloud("SCT030")},
+			Temperature: []TemperatureForecast{
+				TemperatureForecast{Temp: 29, DateTime: time.Date(curYear, curMonth, 30, 12, 0, 0, 0, time.UTC), IsMax: true, IsMin: false},
+				TemperatureForecast{Temp: 16, DateTime: time.Date(curYear, curMonth+1, 1, 2, 0, 0, 0, time.UTC), IsMax: false, IsMin: true}},
+			NotDecodedTokens: nil}},
 }
 
 func TestDecodeTAF(t *testing.T) {

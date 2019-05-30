@@ -2,12 +2,12 @@
 package clouds
 
 import (
+	cnv "metar/conversion"
 	"regexp"
 	"strconv"
-
-	cnv "github.com/urkk/metar/conversion"
 )
 
+// Cloud - cloud representation
 type Cloud struct {
 	Type CloudType
 	// the height is stored in hundreds of feet, as Flight Level
@@ -18,6 +18,7 @@ type Cloud struct {
 	CBNotDefined     bool
 }
 
+// CloudType - Cloud amounts
 type CloudType string
 
 // predefined cloud amount code
@@ -33,16 +34,17 @@ const (
 	NotDefined = "///"
 )
 
-// returns height above surface of the lower base of cloudiness in meters
+// HeightM - returns height above surface of the lower base of cloudiness in meters
 func (cl Cloud) HeightM() int {
 	return cnv.FtToM(cl.height * 100)
 }
 
-// returns height above surface of the lower base of cloudiness in feet
+// HeightFt - returns height above surface of the lower base of cloudiness in feet
 func (cl Cloud) HeightFt() int {
 	return cl.height * 100
 }
 
+// ParseCloud - identify and parses the representation of cloudiness in the string
 func ParseCloud(token string) (cl Cloud, ok bool) {
 
 	pattern := `^(FEW|SCT|BKN|OVC|NSC|SKC|NCD|CLR|///)(\d{3}|///)?(TCU|CB|///)?`
