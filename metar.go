@@ -43,7 +43,7 @@ type MetarMessage struct {
 	PhenomenaNotDefined          bool              // Not detected by the automatic station - “//”
 	VerticalVisibility           int               // Vertical visibility (ft)
 	VerticalVisibilityNotDefined bool              // “///”
-	Clouds                       []clouds.Cloud    // Cloud amount and height
+	Clouds                       clouds.Cloudness  // Cloud amount and height
 	Temperature                  int               // Temperature in degrees Celsius
 	Dewpoint                     int               // Dew point in degrees Celsius
 	QNHhPa                       int               // Altimeter setting.  Atmospheric pressure adjusted to mean sea level
@@ -154,9 +154,6 @@ func (r *myRegexp) FindStringSubmatchMap(s string) map[string]string {
 }
 
 func (m *MetarMessage) decodeMetar(tokens []string) {
-
-	var regex *regexp.Regexp
-	var matches []string
 	totalcount := len(tokens)
 	for count := 0; count < totalcount; {
 		// Surface wind
@@ -186,7 +183,8 @@ func (m *MetarMessage) decodeMetar(tokens []string) {
 				count++
 			}
 			// Cloudiness description
-			for count < totalcount && m.appendCloud(tokens[count]) {
+			//for count < totalcount && m.appendCloud(tokens[count]) {
+			for count < totalcount && m.Clouds.AppendCloud(tokens[count]) {
 				count++
 			}
 		} //end !CAVOK
@@ -204,20 +202,8 @@ func (m *MetarMessage) decodeMetar(tokens []string) {
 			count++
 		}
 		// Wind shear
-		//TODO переделать на функцию
-		regex = regexp.MustCompile(`^WS\s((R\d{2}[LCR]?)|(ALL\sRWY))`)
-		matches = regex.FindStringSubmatch(strings.Join(tokens[count:], " "))
-		for ; len(matches) > 0; matches = regex.FindStringSubmatch(strings.Join(tokens[count:], " ")) {
-			if matches[3] != "" { // WS ALL RWY
-				rd := new(rwy.RunwayDesignator)
-				rd.AllRunways = true
-				m.WindShear = append(m.WindShear, *rd)
-				count += 3
-			}
-			if matches[2] != "" { // WS R03
-				m.WindShear = append(m.WindShear, rwy.NewRD(matches[1]))
-				count += 2
-			}
+		if ok, tokensused := m.appendWindShears(tokens, count); ok {
+			count += tokensused
 		}
 		// TODO Sea surface condition
 		// W19/S4  W15/Н7  W15/Н17 W15/Н175
@@ -310,15 +296,6 @@ func (m *MetarMessage) appendPhenomena(input string) bool {
 	return false
 }
 
-func (m *MetarMessage) appendCloud(input string) bool {
-
-	if cl, ok := clouds.ParseCloud(input); ok {
-		m.Clouds = append(m.Clouds, cl)
-		return true
-	}
-	return false
-}
-
 func (m *MetarMessage) appendRecentPhenomena(input string) bool {
 
 	if p := ph.ParseRecentPhenomena(input); p != nil {
@@ -329,16 +306,9 @@ func (m *MetarMessage) appendRecentPhenomena(input string) bool {
 }
 
 func (m *MetarMessage) setVerticalVisibility(input string) bool {
-
-	regex := regexp.MustCompile(`VV(\d{3}|///)`)
-	matches := regex.FindStringSubmatch(input)
-	if len(matches) != 0 && matches[0] != "" {
-		if matches[1] != "///" {
-			m.VerticalVisibility, _ = strconv.Atoi(matches[1])
-			m.VerticalVisibility *= 100
-		} else {
-			m.VerticalVisibilityNotDefined = true
-		}
+	if vv, nd, ok := parseVerticalVisibility(input); ok {
+		m.VerticalVisibility = vv
+		m.VerticalVisibilityNotDefined = nd
 		return true
 	}
 	return false
@@ -357,4 +327,42 @@ func (m *MetarMessage) appendRunwayState(input string) bool {
 		return true
 	}
 	return false
+}
+
+func parseVerticalVisibility(input string) (vv int, nd bool, ok bool) {
+
+	regex := regexp.MustCompile(`VV(\d{3}|///)`)
+	matches := regex.FindStringSubmatch(input)
+	if len(matches) != 0 && matches[0] != "" {
+		ok = true
+		if matches[1] != "///" {
+			vv, _ = strconv.Atoi(matches[1])
+			vv *= 100
+		} else {
+			nd = true
+		}
+	}
+	return
+}
+
+func (m *MetarMessage) appendWindShears(tokens []string, count int) (ok bool, tokensused int) {
+
+	regex := regexp.MustCompile(`^WS\s((R\d{2}[LCR]?)|(ALL\sRWY))`)
+	matches := regex.FindStringSubmatch(strings.Join(tokens[count:], " "))
+	for ; len(matches) > 0; matches = regex.FindStringSubmatch(strings.Join(tokens[count:], " ")) {
+		ok = true
+		if matches[3] != "" { // WS ALL RWY
+			rd := new(rwy.RunwayDesignator)
+			rd.AllRunways = true
+			m.WindShear = append(m.WindShear, *rd)
+			tokensused += 3
+			count += 3
+		}
+		if matches[2] != "" { // WS R03
+			m.WindShear = append(m.WindShear, rwy.NewRD(matches[1]))
+			tokensused += 2
+			count += 2
+		}
+	}
+	return
 }

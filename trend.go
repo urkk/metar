@@ -1,8 +1,8 @@
 package metar
 
 import (
+	"log"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -38,7 +38,7 @@ type Trend struct {
 	Wind                         wind.Wind
 	CAVOK                        bool
 	Phenomena                    []ph.Phenomena
-	Clouds                       []clouds.Cloud
+	Clouds                       clouds.Cloudness
 	setData                      func(input string) bool
 }
 
@@ -84,7 +84,7 @@ func parseTrendData(tokens []string) (trend *Trend) {
 				count++
 			}
 			// Clouds. No further information after the clouds in trend
-			for count < len(tokens) && trend.appendCloud(tokens[count]) {
+			for count < len(tokens) && trend.Clouds.AppendCloud(tokens[count]) {
 				count++
 			}
 		}
@@ -93,31 +93,41 @@ func parseTrendData(tokens []string) (trend *Trend) {
 }
 
 // Checks the string for correspondence to the forecast date/time template. Sets the date/time in case of success.
-func (trend *Trend) setDateTime(input string) bool {
+func (trend *Trend) setDateTime(input string) (ok bool) {
 
 	regex := regexp.MustCompile(`^(\d{4})/(\d{4})`)
 	matches := regex.FindStringSubmatch(input)
 	if len(matches) != 0 && matches[0] != "" {
-		starttime := matches[1]
-		endtime := matches[2]
-		// hours maybe 24
-		if starttime[2:] == "24" {
-			starttime = starttime[:2] + "23"
-			trend.FM, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+starttime)
-			trend.FM = trend.FM.Add(time.Hour)
+		ok = true
+		t, err := parseTime(matches[1])
+		if err == nil {
+			trend.FM = t
 		} else {
-			trend.FM, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+starttime)
+			log.Println(err)
+			ok = false
 		}
-		if endtime[2:] == "24" {
-			endtime = endtime[:2] + "23"
-			trend.TL, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+endtime)
-			trend.TL = trend.TL.Add(time.Hour)
+		t, err = parseTime(matches[2])
+		if err == nil {
+			trend.TL = t
 		} else {
-			trend.TL, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+endtime)
+			log.Println(err)
+			ok = false
 		}
-		return true
 	}
-	return false
+	return
+}
+
+// parses the transmitted string, taking into account that the number of hours can be 24
+func parseTime(input string) (t time.Time, err error) {
+	var inputString string
+	if input[2:] == "24" {
+		inputString = input[:2] + "23"
+		t, err = time.Parse("2006010215", CurYearStr+CurMonthStr+inputString)
+		t = t.Add(time.Hour)
+	} else {
+		t, err = time.Parse("2006010215", CurYearStr+CurMonthStr+input)
+	}
+	return t, err
 }
 
 func (trend *Trend) setProbability(input string) bool {
@@ -134,39 +144,43 @@ func (trend *Trend) setProbability(input string) bool {
 	return false
 }
 
-func (trend *Trend) setPeriodOfChanges(input string) bool {
-
+func (trend *Trend) setPeriodOfChanges(input string) (ok bool) {
 	switch input[0:2] {
 	case "AT":
 		timeofaction, err := time.Parse("200601021504", CurYearStr+CurMonthStr+CurDayStr+input[2:])
-		if err != nil {
-			return false
+		if err == nil {
+			trend.AT = timeofaction
+			ok = true
+		} else {
+			log.Println(err)
 		}
-		trend.AT = timeofaction
-		return true
 	case "FM":
 		timeofaction, err := time.Parse("200601021504", CurYearStr+CurMonthStr+CurDayStr+input[2:])
-		if err != nil {
-			return false
-		}
-		trend.FM = timeofaction
-		return true
-	case "TL":
-		if input[2:] == "2400" {
-			trend.TL, _ = time.Parse("200601021504", CurYearStr+CurMonthStr+CurDayStr+"2300")
-			trend.TL = trend.TL.Add(time.Hour)
+		if err == nil {
+			trend.FM = timeofaction
+			ok = true
 		} else {
-			timeofaction, err := time.Parse("200601021504", CurYearStr+CurMonthStr+CurDayStr+input[2:])
-			if err != nil {
-				return false
-			}
-			trend.TL = timeofaction
-			return true
+			log.Println(err)
+		}
+	case "TL":
+		var t time.Time
+		var err error
+		if input[2:] == "2400" {
+			t, err = time.Parse("200601021504", CurYearStr+CurMonthStr+CurDayStr+"2300")
+			t = t.Add(time.Hour)
+		} else {
+			t, err = time.Parse("200601021504", CurYearStr+CurMonthStr+CurDayStr+input[2:])
+		}
+		if err == nil {
+			trend.TL = t
+			ok = true
+		} else {
+			log.Println(err)
 		}
 	default:
-		return false
+		return
 	}
-	return false
+	return
 }
 
 func (trend *Trend) setTypeOfTrend(input string) bool {
@@ -184,24 +198,9 @@ func (trend *Trend) setTypeOfTrend(input string) bool {
 
 func (trend *Trend) setVerticalVisibility(input string) bool {
 
-	regex := regexp.MustCompile(`^VV(\d{3}|///)`)
-	matches := regex.FindStringSubmatch(input)
-	if len(matches) != 0 && matches[0] != "" {
-		if matches[1] != "///" {
-			trend.VerticalVisibility, _ = strconv.Atoi(matches[1])
-			trend.VerticalVisibility *= 100
-		} else {
-			trend.VerticalVisibilityNotDefined = true
-		}
-		return true
-	}
-	return false
-}
-
-func (trend *Trend) appendCloud(input string) bool {
-
-	if cl, ok := clouds.ParseCloud(input); ok {
-		trend.Clouds = append(trend.Clouds, cl)
+	if vv, nd, ok := parseVerticalVisibility(input); ok {
+		trend.VerticalVisibility = vv
+		trend.VerticalVisibilityNotDefined = nd
 		return true
 	}
 	return false

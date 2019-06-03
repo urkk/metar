@@ -93,6 +93,13 @@ var trendparsetests = []trendparsetest{
 			Clouds: []clouds.Cloud{getCloud("BKN015//")},
 		},
 	},
+	// clock error
+	{[]string{"BECMG", "2526/2526", "0500", "FG"},
+		Trend{Type: BECMG,
+			Visibility: Visibility{Distance: 500, LowerDistance: 0, LowerDirection: ""},
+			Phenomena:  []phenomena.Phenomena{phenomena.Phenomena{Vicinity: false, Abbreviation: "FG", Intensity: ""}},
+		},
+	},
 }
 
 func TestParseTrendData(t *testing.T) {

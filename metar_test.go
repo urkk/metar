@@ -190,7 +190,7 @@ var metarparsetests = []metarparsetest{
 			DateTime:    time.Date(curYear, curMonth, 24, 7, 0, 0, 0, time.UTC),
 			Wind:        getWind("11006MPS"),
 			Visibility:  Visibility{Distance: 9999, LowerDistance: 0, LowerDirection: ""},
-			Clouds:      []clouds.Cloud{getCloud("SCT011"), getCloud("OVC018CB")},
+			Clouds:      clouds.Cloudness{getCloud("SCT011"), getCloud("OVC018CB")},
 			Temperature: 5,
 			Dewpoint:    4,
 			QNHhPa:      1002,

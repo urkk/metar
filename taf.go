@@ -38,7 +38,7 @@ type TAFMessage struct {
 	Visibility         Visibility            // Horizontal visibility
 	Phenomena          []ph.Phenomena        // Present Weather
 	VerticalVisibility int                   // Vertical visibility (ft)
-	Clouds             []clouds.Cloud        // Cloud amount and height
+	Clouds             clouds.Cloudness      // Cloud amount and height
 	Temperature        []TemperatureForecast // Temperature extremes
 	// Prevision
 	TREND []Trend
@@ -99,10 +99,8 @@ func (t *TAFMessage) decodeTAF(tokens []string) {
 			t.Wind = wnd
 			count += tokensused
 		}
-		if tokens[count] == "CAVOK" {
-			t.CAVOK = true
-			count++
-		} else {
+		t.CAVOK = tokens[count] == "CAVOK"
+		if !t.CAVOK {
 			// Horizontal visibility
 			if vis, tokensused := ParseVisibility(tokens[count]); tokensused > 0 {
 				t.Visibility = vis
@@ -117,9 +115,11 @@ func (t *TAFMessage) decodeTAF(tokens []string) {
 				count++
 			}
 			// Cloudiness description
-			for count < len(tokens) && t.appendCloud(tokens[count]) {
+			for count < len(tokens) && t.Clouds.AppendCloud(tokens[count]) {
 				count++
 			}
+		} else {
+			count++
 		} // !CAVOK
 
 		// Temperature
@@ -181,15 +181,6 @@ func (t *TAFMessage) appendPhenomena(input string) bool {
 
 	if p := ph.ParsePhenomena(input); p != nil {
 		t.Phenomena = append(t.Phenomena, *p)
-		return true
-	}
-	return false
-}
-
-func (t *TAFMessage) appendCloud(input string) bool {
-
-	if cl, ok := clouds.ParseCloud(input); ok {
-		t.Clouds = append(t.Clouds, cl)
 		return true
 	}
 	return false

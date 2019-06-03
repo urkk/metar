@@ -2,9 +2,10 @@
 package clouds
 
 import (
-	cnv "github.com/urkk/metar/conversion"
 	"regexp"
 	"strconv"
+
+	cnv "github.com/urkk/metar/conversion"
 )
 
 // Cloud - cloud representation
@@ -16,6 +17,19 @@ type Cloud struct {
 	Cumulonimbus     bool
 	ToweringCumulus  bool
 	CBNotDefined     bool
+}
+
+// Cloudness - an array of heights and types of clouds
+type Cloudness []Cloud
+
+// AppendCloud - Check whether the string is a description of cloudiness. If successful, adds a new cloud layer
+func (m *Cloudness) AppendCloud(input string) bool {
+
+	if cl, ok := ParseCloud(input); ok {
+		*m = append(*m, cl)
+		return true
+	}
+	return false
 }
 
 // CloudType - Cloud amounts
