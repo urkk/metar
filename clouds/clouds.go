@@ -19,11 +19,11 @@ type Cloud struct {
 	CBNotDefined     bool
 }
 
-// Cloudness - an array of heights and types of clouds
-type Cloudness []Cloud
+// Clouds - an array of heights and types of clouds
+type Clouds []Cloud
 
 // AppendCloud - Check whether the string is a description of cloudiness. If successful, adds a new cloud layer
-func (m *Cloudness) AppendCloud(input string) bool {
+func (m *Clouds) AppendCloud(input string) bool {
 
 	if cl, ok := ParseCloud(input); ok {
 		*m = append(*m, cl)

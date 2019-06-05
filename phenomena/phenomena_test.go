@@ -4,7 +4,7 @@ import "testing"
 
 type testpair struct {
 	input    string
-	expected *Phenomena
+	expected *Phenomenon
 	correct  bool
 }
 
@@ -14,15 +14,15 @@ var tests = []testpair{
 	// Intensity    Intensity
 	// Abbreviation string
 
-	{"PLRADZ", &Phenomena{false, Moderate, "PLRADZ"}, true},
-	{"+SHRASNGS", &Phenomena{false, Heavy, "SHRASNGS"}, true},
-	{"VCBLDU", &Phenomena{true, Moderate, "BLDU"}, true},
+	{"PLRADZ", &Phenomenon{false, Moderate, "PLRADZ"}, true},
+	{"+SHRASNGS", &Phenomenon{false, Heavy, "SHRASNGS"}, true},
+	{"VCBLDU", &Phenomenon{true, Moderate, "BLDU"}, true},
 	// not can VC
-	{"VCSNDZ", &Phenomena{true, Moderate, "VCSNDZ"}, false},
-	{"SHGRRA", &Phenomena{false, Moderate, "SHGRRA"}, true},
+	{"VCSNDZ", &Phenomenon{true, Moderate, "VCSNDZ"}, false},
+	{"SHGRRA", &Phenomenon{false, Moderate, "SHGRRA"}, true},
 	// "Light" not be applicable
-	{"-FC", &Phenomena{false, Light, "FC"}, false},
-	{"-PLDZ", &Phenomena{false, Light, "PLDZ"}, true},
+	{"-FC", &Phenomenon{false, Light, "FC"}, false},
+	{"-PLDZ", &Phenomenon{false, Light, "PLDZ"}, true},
 }
 
 var recenttests = []testpair{
@@ -31,12 +31,13 @@ var recenttests = []testpair{
 	// Intensity    Intensity
 	// Abbreviation string
 
-	{"REFZDZ", &Phenomena{false, Moderate, "FZDZ"}, true},
-	{"+REFZDZ", &Phenomena{false, Heavy, "FZDZ"}, false},
-	{"RERASN", &Phenomena{false, Moderate, "RASN"}, true},
+	{"REFZDZ", &Phenomenon{false, Moderate, "FZDZ"}, true},
+	{"+REFZDZ", &Phenomenon{false, Heavy, "FZDZ"}, false},
+	{"RERASN", &Phenomenon{false, Moderate, "RASN"}, true},
 }
 
 func TestParsePhenomena(t *testing.T) {
+	arr := &Phenomena{}
 	for _, pair := range tests {
 		ph := ParsePhenomena(pair.input)
 		if pair.correct {
@@ -47,13 +48,20 @@ func TestParsePhenomena(t *testing.T) {
 					"got", ph,
 				)
 			}
-		} else if !pair.correct && ph != nil {
-			t.Error("false positive at " + pair.input)
+			if !arr.AppendPhenomena(pair.input) {
+				t.Error("For", pair.input, "error append phenomenon")
+			}
+		} else if !pair.correct {
+			if ph != nil || arr.AppendPhenomena(pair.input) {
+				t.Error("false positive at " + pair.input)
+			}
+
 		}
 	}
 }
 
 func TestParseRecentPhenomena(t *testing.T) {
+	arr := &Phenomena{}
 	for _, pair := range recenttests {
 		ph := ParseRecentPhenomena(pair.input)
 		if pair.correct {
@@ -64,8 +72,13 @@ func TestParseRecentPhenomena(t *testing.T) {
 					"got", ph,
 				)
 			}
-		} else if !pair.correct && ph != nil {
-			t.Error("false positive at " + pair.input)
+			if !arr.AppendRecentPhenomena(pair.input) {
+				t.Error("For", pair.input, "error append phenomenon")
+			}
+		} else if !pair.correct {
+			if ph != nil || arr.AppendRecentPhenomena(pair.input) {
+				t.Error("false positive at " + pair.input)
+			}
 		}
 	}
 }

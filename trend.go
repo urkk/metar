@@ -29,21 +29,20 @@ type Trend struct {
 	Probability int // used only in TAFs. Maybe only 30 or 40. The PROBdd group is not used in conjunction with BECMG and FM
 	// In case of in metar use values indicated time of changes. hh:mm (BECMG FM1030 TL1130)
 	// In TAFs used from - until fields as date/time. ddhh/ddhh (TEMPO 2208/2218)
-	FM                           time.Time // FroM (time)
-	TL                           time.Time // unTiL (time)
-	AT                           time.Time // AT time
-	Visibility                   Visibility
+	FM time.Time // FroM (time)
+	TL time.Time // unTiL (time)
+	AT time.Time // AT time
+	Visibility
 	VerticalVisibility           int
 	VerticalVisibilityNotDefined bool
-	Wind                         wind.Wind
-	CAVOK                        bool
-	Phenomena                    []ph.Phenomena
-	Clouds                       clouds.Cloudness
-	setData                      func(input string) bool
+	wind.Wind
+	CAVOK bool
+	ph.Phenomena
+	clouds.Clouds
 }
 
 func parseTrendData(tokens []string) (trend *Trend) {
-	trend = new(Trend)
+	trend = &Trend{}
 	for count := 0; count < len(tokens); count++ {
 		// PROB30 (40)
 		if trend.setProbability(tokens[count]) {
@@ -62,32 +61,14 @@ func parseTrendData(tokens []string) (trend *Trend) {
 			count++
 		}
 		// Wind. Only the prevailing direction.
-		if wnd, tokensused := wind.ParseWind(tokens[count]); tokensused > 0 {
-			count += tokensused
-			trend.Wind = wnd
-		}
+		count += trend.ParseWind(tokens[count])
+
 		if count < len(tokens) && tokens[count] == "CAVOK" {
 			trend.CAVOK = true
 			// no data after CAVOK
-		} else {
-			// Horizontal visibility. The distance and direction of the least visibility is not predicted
-			if vis, tokensused := ParseVisibility(strings.Join(tokens[count:], " ")); tokensused > 0 {
-				trend.Visibility = vis
-				count += tokensused
-			}
-			// Weather or NSW - no significant weather
-			for count < len(tokens) && trend.appendPhenomena(tokens[count]) {
-				count++
-			}
-			// Vertical visibility
-			if count < len(tokens) && trend.setVerticalVisibility(tokens[count]) {
-				count++
-			}
-			// Clouds. No further information after the clouds in trend
-			for count < len(tokens) && trend.Clouds.AppendCloud(tokens[count]) {
-				count++
-			}
+			return
 		}
+		count = decodeWeatherCondition(trend, count, tokens)
 	}
 	return trend
 }
@@ -201,15 +182,6 @@ func (trend *Trend) setVerticalVisibility(input string) bool {
 	if vv, nd, ok := parseVerticalVisibility(input); ok {
 		trend.VerticalVisibility = vv
 		trend.VerticalVisibilityNotDefined = nd
-		return true
-	}
-	return false
-}
-
-func (trend *Trend) appendPhenomena(input string) bool {
-
-	if p := ph.ParsePhenomena(input); p != nil {
-		trend.Phenomena = append(trend.Phenomena, *p)
 		return true
 	}
 	return false

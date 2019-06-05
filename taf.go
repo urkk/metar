@@ -31,14 +31,14 @@ type TAFMessage struct {
 	ValidTo   time.Time
 	CNL       bool // The previously issued TAF for the period was cancelled
 
-	Wind wind.Wind //	Surface wind
+	wind.Wind //	Surface wind
 	// Ceiling And Visibility OK, indicating no cloud below 5,000 ft (1,500 m) or the highest minimum sector
 	// altitude and no cumulonimbus or towering cumulus at any level, a visibility of 10 km (6 mi) or more and no significant weather change.
 	CAVOK              bool
-	Visibility         Visibility            // Horizontal visibility
-	Phenomena          []ph.Phenomena        // Present Weather
+	Visibility                               // Horizontal visibility
+	ph.Phenomena                             // Present Weather
 	VerticalVisibility int                   // Vertical visibility (ft)
-	Clouds             clouds.Cloudness      // Cloud amount and height
+	clouds.Clouds                            // Cloud amount and height
 	Temperature        []TemperatureForecast // Temperature extremes
 	// Prevision
 	TREND []Trend
@@ -89,37 +89,15 @@ func (t *TAFMessage) RAW() string { return t.rawData }
 
 func (t *TAFMessage) decodeTAF(tokens []string) {
 
-	totalcount := len(tokens)
+	for count := 0; count < len(tokens); {
+		// Surface wind. Required element
+		count += t.ParseWind(tokens[count])
 
-	for count := 0; count < totalcount; {
-		// Wind - Visibility - Weather - Sky Condition
-
-		// Surface wind
-		if wnd, tokensused := wind.ParseWind(tokens[count]); tokensused > 0 {
-			t.Wind = wnd
-			count += tokensused
-		}
-		t.CAVOK = tokens[count] == "CAVOK"
-		if !t.CAVOK {
-			// Horizontal visibility
-			if vis, tokensused := ParseVisibility(tokens[count]); tokensused > 0 {
-				t.Visibility = vis
-				count += tokensused
-			}
-			// Weather
-			for count < len(tokens) && t.appendPhenomena(tokens[count]) {
-				count++
-			}
-			// Vertical visibility
-			if t.setVerticalVisibility(tokens[count]) {
-				count++
-			}
-			// Cloudiness description
-			for count < len(tokens) && t.Clouds.AppendCloud(tokens[count]) {
-				count++
-			}
-		} else {
+		if tokens[count] == "CAVOK" {
+			t.CAVOK = true
 			count++
+		} else {
+			count = decodeWeatherCondition(t, count, tokens)
 		} // !CAVOK
 
 		// Temperature
@@ -127,7 +105,7 @@ func (t *TAFMessage) decodeTAF(tokens []string) {
 			count++
 		}
 		// The token is not recognized or is located in the wrong position
-		if count < totalcount {
+		if count < len(tokens) {
 			t.NotDecodedTokens = append(t.NotDecodedTokens, tokens[count])
 			count++
 		}
@@ -175,15 +153,6 @@ func (t *TAFMessage) setTimeRange(fromStr, toStr string) {
 	if t.ValidTo.Day() < t.DateTime.Day() {
 		t.ValidTo = t.ValidTo.AddDate(0, 1, 0)
 	}
-}
-
-func (t *TAFMessage) appendPhenomena(input string) bool {
-
-	if p := ph.ParsePhenomena(input); p != nil {
-		t.Phenomena = append(t.Phenomena, *p)
-		return true
-	}
-	return false
 }
 
 func (t *TAFMessage) setVerticalVisibility(input string) bool {

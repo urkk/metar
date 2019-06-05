@@ -31,6 +31,7 @@ var tests = []testpair{
 }
 
 func TestParseCloud(t *testing.T) {
+	arr := &Clouds{}
 	for _, pair := range tests {
 		v, ok := ParseCloud(pair.input)
 		if ok && v != pair.expected {
@@ -39,6 +40,11 @@ func TestParseCloud(t *testing.T) {
 				"expected", pair.expected,
 				"got", v,
 			)
+		}
+		if ok && !arr.AppendCloud(pair.input) {
+			t.Error("For", pair.input, "error append cloud")
+		} else if !ok && arr.AppendCloud(pair.input) {
+			t.Error("For", pair.input, "error append cloud")
 		}
 	}
 }
