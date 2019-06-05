@@ -10,10 +10,14 @@ import (
 type VRTendency string
 
 const (
-	NotDefined = ""  //no changes are reported
-	U          = "U" //upward
-	N          = "N" //no distinct
-	D          = "D" //downward
+	//NotDefined - no changes are reported
+	NotDefined = ""
+	//U - upward
+	U = "U"
+	//N - no distinct
+	N = "N"
+	//D - downward
+	D = "D"
 )
 
 // RunwayDesignator - two-digit runway number

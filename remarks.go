@@ -21,28 +21,27 @@ type Remark struct {
 // WindOnRWY - surface wind observations on the runways
 type WindOnRWY struct {
 	Runway string
-	Wind   wind.Wind
+	wind.Wind
 }
 
 func parseRemarks(tokens []string) *Remark {
-
-	RMK := new(Remark)
-	var count = 0
-	for count < len(tokens) {
+	if len(tokens) == 0 {
+		return nil
+	}
+	RMK := &Remark{}
+	for count := 0; count < len(tokens); {
 		// Wind value on runway. Not documented, but used in URSS and UHMA
-		regex := regexp.MustCompile(`^(R\d{2}[LCR]?)/((\d{3})?(VRB)?(P)?(\d{2})?(G\d\d)?(MPS|KT))`)
+		regex := regexp.MustCompile(`^(R\d{2}[LCR]?)/((\d{3})?(VRB)?(\d{2})?(G\d\d)?(MPS|KT))`)
 		matches := regex.FindStringSubmatch(tokens[count])
 		if len(matches) != 0 && matches[0] != "" {
-			wnd := new(WindOnRWY)
+			wnd := &WindOnRWY{}
 			wnd.Runway = matches[1][1:]
 			input := matches[2]
 			if count < len(tokens)-1 {
 				input += tokens[count+1]
 			}
-			wind, countused := wind.ParseWind(input)
-			wnd.Wind = wind
+			count += wnd.ParseWind(input)
 			RMK.WindOnRWY = append(RMK.WindOnRWY, *wnd)
-			count += countused
 		}
 
 		if count < len(tokens) && strings.HasPrefix(tokens[count], "QBB") {

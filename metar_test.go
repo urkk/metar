@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/urkk/metar/clouds"
-	"github.com/urkk/metar/phenomena"
+	. "github.com/urkk/metar/phenomena"
 	"github.com/urkk/metar/runways"
 	"github.com/urkk/metar/wind"
 )
@@ -16,8 +16,8 @@ var curMonth = time.Now().Month()
 var curDay = time.Now().Day()
 
 type visibilityparsetest struct {
-	input    string
-	expected Visibility
+	input    []string
+	expected *Visibility
 	tokens   int
 }
 
@@ -26,21 +26,23 @@ var visibilityparsetests = []visibilityparsetest{
 	// LowerDistance  int
 	// LowerDirection string
 
-	{"2000", Visibility{2000, 0, ""}, 1},
-	{"3000 1500NE", Visibility{3000, 1500, "NE"}, 2},
-	{"1500 1000S", Visibility{1500, 1000, "S"}, 2},
-	{"9999", Visibility{9999, 0, ""}, 1},
-	{"20008MPS", Visibility{0, 0, ""}, 0},
+	{[]string{"2000"}, &Visibility{2000, 0, ""}, 1},
+	{[]string{"3000", "1500NE"}, &Visibility{3000, 1500, "NE"}, 2},
+	{[]string{"1500", "1000S"}, &Visibility{1500, 1000, "S"}, 2},
+	{[]string{"9999"}, &Visibility{9999, 0, ""}, 1},
+	{[]string{"20008MPS"}, &Visibility{0, 0, ""}, 0},
 }
 
 func TestParseVisibility(t *testing.T) {
 	for _, pair := range visibilityparsetests {
-		v, tokensused := ParseVisibility(pair.input)
-		if tokensused > 0 && v != pair.expected || tokensused != pair.tokens {
+		vis := &Visibility{}
+		tokensused := vis.ParseVisibility(pair.input)
+
+		if tokensused > 0 && !reflect.DeepEqual(vis, pair.expected) || tokensused != pair.tokens {
 			t.Error(
 				"For", pair.input,
 				"expected", pair.expected,
-				"got", v,
+				"got", vis,
 			)
 		}
 	}
@@ -52,8 +54,9 @@ type remarksparsetest struct {
 }
 
 func getWind(inp string) wind.Wind {
-	w, _ := wind.ParseWind(inp)
-	return w
+	w := &wind.Wind{}
+	w.ParseWind(inp)
+	return *w
 }
 
 var remarksparsetests = []remarksparsetest{
@@ -101,7 +104,7 @@ var metarparsetests = []metarparsetest{
 			Wind:                         getWind("22003MPS"),
 			Visibility:                   Visibility{Distance: 9999, LowerDistance: 0, LowerDirection: ""},
 			VerticalVisibilityNotDefined: true,
-			Phenomena:                    []phenomena.Phenomena{phenomena.Phenomena{Vicinity: true, Intensity: "", Abbreviation: "FG"}},
+			Phenomena:                    []Phenomenon{Phenomenon{Vicinity: true, Intensity: "", Abbreviation: "FG"}},
 			Temperature:                  17,
 			Dewpoint:                     11,
 			QNHhPa:                       1018,
@@ -113,7 +116,7 @@ var metarparsetests = []metarparsetest{
 			DateTime:    time.Date(curYear, curMonth, 27, 6, 0, 0, 0, time.UTC),
 			Wind:        getWind("22003MPS"),
 			Visibility:  Visibility{Distance: 9999, LowerDistance: 0, LowerDirection: ""},
-			Phenomena:   []phenomena.Phenomena{phenomena.Phenomena{Vicinity: true, Intensity: "", Abbreviation: "FG"}},
+			Phenomena:   []Phenomenon{Phenomenon{Vicinity: true, Intensity: "", Abbreviation: "FG"}},
 			Clouds:      []clouds.Cloud{getCloud("NSC")},
 			Temperature: 17,
 			Dewpoint:    11,
@@ -149,7 +152,7 @@ var metarparsetests = []metarparsetest{
 				Type:               TEMPO,
 				Wind:               getWind("32010G17MPS"),
 				Visibility:         Visibility{Distance: 8000, LowerDistance: 0, LowerDirection: ""},
-				Phenomena:          []phenomena.Phenomena{phenomena.Phenomena{Vicinity: false, Abbreviation: "FG", Intensity: ""}},
+				Phenomena:          []Phenomenon{Phenomenon{Vicinity: false, Abbreviation: "FG", Intensity: ""}},
 				VerticalVisibility: 8000,
 			},
 			},
@@ -177,12 +180,10 @@ var metarparsetests = []metarparsetest{
 			Dewpoint:            -11,
 			QNHhPa:              1018,
 			WindShear:           []runways.RunwayDesignator{runways.RunwayDesignator{Number: "", AllRunways: true}},
-			RecentPhenomena:     []phenomena.Phenomena{phenomena.Phenomena{Vicinity: false, Abbreviation: "SN", Intensity: ""}},
+			RecentPhenomena:     []Phenomenon{Phenomenon{Vicinity: false, Abbreviation: "SN", Intensity: ""}},
 		}},
 	{"TAF UUWW 121350Z 1215/1315 VRB01MPS 9999 SCT040 TX22/1215Z TN13/1302Z TEMPO 1221/1315 3100 -SHRA FEW007 BKN011CB",
-		&MetarMessage{rawData: "TAF UUWW 121350Z 1215/1315 VRB01MPS 9999 SCT040 TX22/1215Z TN13/1302Z TEMPO 1221/1315 3100 -SHRA FEW007 BKN011CB",
-			NotDecodedTokens: []string{"TAF UUWW 121350Z 1215/1315 VRB01MPS 9999 SCT040 TX22/1215Z TN13/1302Z TEMPO 1221/1315 3100 -SHRA FEW007 BKN011CB"},
-		}},
+		&MetarMessage{rawData: "TAF UUWW 121350Z 1215/1315 VRB01MPS 9999 SCT040 TX22/1215Z TN13/1302Z TEMPO 1221/1315 3100 -SHRA FEW007 BKN011CB"}},
 	{"COR UHMM 240700Z 11006MPS 9999 -SHRA SCT011 OVC018CB 05/04 Q1002 RMK R01/18004MPS",
 		&MetarMessage{rawData: "COR UHMM 240700Z 11006MPS 9999 -SHRA SCT011 OVC018CB 05/04 Q1002 RMK R01/18004MPS",
 			COR:         true,
@@ -190,11 +191,11 @@ var metarparsetests = []metarparsetest{
 			DateTime:    time.Date(curYear, curMonth, 24, 7, 0, 0, 0, time.UTC),
 			Wind:        getWind("11006MPS"),
 			Visibility:  Visibility{Distance: 9999, LowerDistance: 0, LowerDirection: ""},
-			Clouds:      clouds.Cloudness{getCloud("SCT011"), getCloud("OVC018CB")},
+			Clouds:      clouds.Clouds{getCloud("SCT011"), getCloud("OVC018CB")},
 			Temperature: 5,
 			Dewpoint:    4,
 			QNHhPa:      1002,
-			Phenomena:   []phenomena.Phenomena{phenomena.Phenomena{Vicinity: false, Abbreviation: "SHRA", Intensity: "-"}},
+			Phenomena:   []Phenomenon{Phenomenon{Vicinity: false, Abbreviation: "SHRA", Intensity: "-"}},
 			Remarks:     &Remark{WindOnRWY: []WindOnRWY{WindOnRWY{Runway: "01", Wind: getWind("18004MPS")}}},
 		}},
 	{"METAR UOOO 052030Z NIL",
@@ -207,8 +208,8 @@ var metarparsetests = []metarparsetest{
 
 func TestDecode(t *testing.T) {
 	for _, pair := range metarparsetests {
-		msg := NewMETAR(pair.input)
-		if !reflect.DeepEqual(msg, pair.expected) || msg.RAW() != pair.input {
+		msg, err := NewMETAR(pair.input)
+		if err == nil && !reflect.DeepEqual(msg, pair.expected) || msg.RAW() != pair.input {
 			t.Error(
 				"For", pair.input,
 				"expected", pair.expected,

@@ -25,24 +25,27 @@ func (w *Wind) SpeedKt() int {
 	return int(math.Round(cnv.MpsToKts(w.speed)))
 }
 
+// SpeedMps - returns wind speed in meters per second.
 func (w *Wind) SpeedMps() int {
 	return int(math.Round(w.speed))
 }
 
+// GustsSpeedKt - returns gusts speed in knots.
 func (w *Wind) GustsSpeedKt() int {
 	return int(math.Round(cnv.MpsToKts(w.gustsSpeed)))
 }
 
+// GustsSpeedMps - returns gusts speed in meters per second.
 func (w *Wind) GustsSpeedMps() int {
 	return int(math.Round(w.gustsSpeed))
 }
 
 // ParseWind - identify and parses the representation of wind in the string
-func ParseWind(token string) (w Wind, tokensused int) {
+func (w *Wind) ParseWind(token string) (tokensused int) {
 
 	rx := `^(\d{3}|VRB)(P)?(\d{2})(G\d\d)?(MPS|KT|KPH|KMH)\s?(\d{3}V\d{3})?`
 	if matched, _ := regexp.MatchString(rx, token); !matched {
-		return w, tokensused
+		return
 	}
 	tokensused = 1
 	regex := regexp.MustCompile(rx)
@@ -73,5 +76,5 @@ func ParseWind(token string) (w Wind, tokensused int) {
 		w.VariableFrom, _ = strconv.Atoi(matches[6][0:3])
 		w.VariableTo, _ = strconv.Atoi(matches[6][4:])
 	}
-	return w, tokensused
+	return tokensused
 }

@@ -27,29 +27,29 @@ func init() {
 
 // MetarMessage - Meteorological report presented as a data structure
 type MetarMessage struct {
-	rawData  string    // The raw METAR
-	COR      bool      // Correction to observation
-	Station  string    // 4-letter ICAO station identifier
-	DateTime time.Time // Time (in ISO8601 date/time format) this METAR was observed
-	Auto     bool      // METAR from automatic observing systems with no human intervention
-	NIL      bool      // event of missing METAR
-	Wind     wind.Wind //	Surface wind
+	rawData   string    // The raw METAR
+	COR       bool      // Correction to observation
+	Station   string    // 4-letter ICAO station identifier
+	DateTime  time.Time // Time (in ISO8601 date/time format) this METAR was observed
+	Auto      bool      // METAR from automatic observing systems with no human intervention
+	NIL       bool      // event of missing METAR
+	wind.Wind           //	Surface wind
 	// Ceiling And Visibility OK, indicating no cloud below 5,000 ft (1,500 m) or the highest minimum sector
 	// altitude and no cumulonimbus or towering cumulus at any level, a visibility of 10 km (6 mi) or more and no significant weather change.
 	CAVOK                        bool
-	Visibility                   Visibility        // Horizontal visibility. In meters
+	Visibility                                     // Horizontal visibility. In meters
 	RWYvisibility                []rwy.VisualRange // Runway visual range
-	Phenomena                    []ph.Phenomena    // Present Weather
+	ph.Phenomena                                   // Present Weather
 	PhenomenaNotDefined          bool              // Not detected by the automatic station - “//”
 	VerticalVisibility           int               // Vertical visibility (ft)
 	VerticalVisibilityNotDefined bool              // “///”
-	Clouds                       clouds.Cloudness  // Cloud amount and height
+	clouds.Clouds                                  // Cloud amount and height
 	Temperature                  int               // Temperature in degrees Celsius
 	Dewpoint                     int               // Dew point in degrees Celsius
 	QNHhPa                       int               // Altimeter setting.  Atmospheric pressure adjusted to mean sea level
 	// Supplementary informaton
 	//Recent weather
-	RecentPhenomena []ph.Phenomena
+	RecentPhenomena ph.Phenomena
 	// Information on the state of the runway(s)
 	RWYState []rwy.State
 	// Wind shear on runway(s)
@@ -67,8 +67,14 @@ type MetarMessage struct {
 // RAW - returns the original message text
 func (m *MetarMessage) RAW() string { return m.rawData }
 
+func (m *MetarMessage) appendTrend(input []string) {
+	if trend := parseTrendData(input); trend != nil {
+		m.TREND = append(m.TREND, *trend)
+	}
+}
+
 // NewMETAR - creates a new METAR based on the original message
-func NewMETAR(inputtext string) *MetarMessage {
+func NewMETAR(inputtext string) (*MetarMessage, error) {
 
 	m := &MetarMessage{
 		rawData: inputtext,
@@ -81,17 +87,15 @@ func NewMETAR(inputtext string) *MetarMessage {
 	m.Auto = headermap["auto"] != ""
 	m.NIL = headermap["nil"] != ""
 	if m.Station == "" && m.DateTime.IsZero() {
-		//not valid message?
-		m.NotDecodedTokens = append(m.NotDecodedTokens, m.rawData)
-		return m
+		return m, fmt.Errorf("Not valid message in input")
 	}
 	if m.NIL {
-		return m
+		return m, nil
 	}
 	tokens := strings.Split(m.rawData, " ")
-
 	count := 0
 	totalcount := len(tokens)
+	// skip station info, date/time, etc.
 	for _, value := range headermap {
 		if value != "" {
 			count++
@@ -112,18 +116,15 @@ func NewMETAR(inputtext string) *MetarMessage {
 			totalcount = i
 		}
 	}
-
+	// trends
 	for _, trendstr := range trends {
-		if trend := parseTrendData(trendstr); trend != nil {
-			m.TREND = append(m.TREND, *trend)
-		}
+		m.appendTrend(trendstr)
 	}
-
-	if len(remarks) > 0 {
-		m.Remarks = parseRemarks(remarks)
-	}
+	// remarks
+	m.Remarks = parseRemarks(remarks)
+	// main section
 	m.decodeMetar(tokens[count:totalcount])
-	return m
+	return m, nil
 }
 
 // Visibility - prevailing visibility
@@ -131,6 +132,27 @@ type Visibility struct {
 	Distance       int
 	LowerDistance  int
 	LowerDirection string
+}
+
+// ParseVisibility - identify and parses the representation oh horizontal visibility
+func (v *Visibility) ParseVisibility(input []string) (tokensused int) {
+
+	inputstring := strings.Join(input, " ")
+	// The literal P (M) is not listed in the documentation, but is used in messages
+	pattern := `^(P|M)?(\d{4})(\s|$)((\d{4})(NE|SE|NW|SW|N|E|S|W))?`
+	if matched, _ := regexp.MatchString(pattern, inputstring); !matched {
+		return
+	}
+	tokensused = 1
+	regex := regexp.MustCompile(pattern)
+	matches := regex.FindStringSubmatch(inputstring)
+	v.Distance, _ = strconv.Atoi(matches[2])
+	if matches[4] != "" {
+		v.LowerDistance, _ = strconv.Atoi(matches[5])
+		v.LowerDirection = matches[6]
+		tokensused++
+	}
+	return
 }
 
 type myRegexp struct {
@@ -154,39 +176,20 @@ func (r *myRegexp) FindStringSubmatchMap(s string) map[string]string {
 }
 
 func (m *MetarMessage) decodeMetar(tokens []string) {
+
+	if tokens[len(tokens)-1] == "NOSIG" {
+		m.NOSIG = true
+		tokens = tokens[:len(tokens)-1]
+	}
 	totalcount := len(tokens)
 	for count := 0; count < totalcount; {
 		// Surface wind
-		if wnd, tokensused := wind.ParseWind(strings.Join(tokens[count:], " ")); tokensused > 0 {
-			m.Wind = wnd
-			count += tokensused
-		}
+		count += m.ParseWind(strings.Join(tokens[count:], " "))
 		if tokens[count] == "CAVOK" {
 			m.CAVOK = true
 			count++
 		} else {
-			// Horizontal visibility
-			if vis, tokensused := ParseVisibility(strings.Join(tokens[count:], " ")); tokensused > 0 {
-				m.Visibility = vis
-				count += tokensused
-			}
-			// Runway visual range
-			for count < totalcount && m.appendRunwayVisualRange(tokens[count]) {
-				count++
-			}
-			// Present Weather
-			for count < totalcount && m.appendPhenomena(tokens[count]) {
-				count++
-			}
-			// Vertical visibility
-			if m.setVerticalVisibility(tokens[count]) {
-				count++
-			}
-			// Cloudiness description
-			//for count < totalcount && m.appendCloud(tokens[count]) {
-			for count < totalcount && m.Clouds.AppendCloud(tokens[count]) {
-				count++
-			}
+			count = setMetarWeatherCondition(m, count, tokens)
 		} //end !CAVOK
 		// Temperature and dew point
 		if m.setTemperature(tokens[count]) {
@@ -198,7 +201,7 @@ func (m *MetarMessage) decodeMetar(tokens []string) {
 		}
 		//	All the following elements are optional
 		// Recent weather
-		for count < totalcount && m.appendRecentPhenomena(tokens[count]) {
+		for count < totalcount && m.RecentPhenomena.AppendRecentPhenomena(tokens[count]) {
 			count++
 		}
 		// Wind shear
@@ -212,10 +215,6 @@ func (m *MetarMessage) decodeMetar(tokens []string) {
 		for count < totalcount && m.appendRunwayState(tokens[count]) {
 			count++
 		}
-		if count < totalcount && tokens[count] == "NOSIG" {
-			m.NOSIG = true
-			count++
-		}
 		// The token is not recognized or is located in the wrong position
 		if count < totalcount {
 			m.NotDecodedTokens = append(m.NotDecodedTokens, tokens[count])
@@ -224,23 +223,32 @@ func (m *MetarMessage) decodeMetar(tokens []string) {
 	} // End main section
 }
 
-// ParseVisibility - identify and parses the representation oh horizontal visibility
-func ParseVisibility(token string) (v Visibility, tokensused int) {
-	// The literal P (M) is not listed in the documentation, but is used in messages
-	pattern := `^(P|M)?(\d{4})(\s|$)((\d{4})(NE|SE|NW|SW|N|E|S|W))?`
-	if matched, _ := regexp.MatchString(pattern, token); !matched {
-		return v, tokensused
+func setMetarWeatherCondition(m *MetarMessage, count int, tokens []string) int {
+	// Horizontal visibility
+	if tokensused := m.ParseVisibility(tokens[count:]); tokensused > 0 {
+		count += tokensused
 	}
-	tokensused = 1
-	regex := regexp.MustCompile(pattern)
-	matches := regex.FindStringSubmatch(token)
-	v.Distance, _ = strconv.Atoi(matches[2])
-	if matches[4] != "" {
-		v.LowerDistance, _ = strconv.Atoi(matches[5])
-		v.LowerDirection = matches[6]
-		tokensused++
+	// Runway visual range
+	for count < len(tokens) && m.appendRunwayVisualRange(tokens[count]) {
+		count++
 	}
-	return v, tokensused
+	// Present Weather
+	if count < len(tokens) && tokens[count] == "//" {
+		m.PhenomenaNotDefined = true
+		count++
+	}
+	for count < len(tokens) && m.AppendPhenomena(tokens[count]) {
+		count++
+	}
+	// Vertical visibility
+	if count < len(tokens) && m.setVerticalVisibility(tokens[count]) {
+		count++
+	}
+	// Cloudiness description
+	for count < len(tokens) && m.AppendCloud(tokens[count]) {
+		count++
+	}
+	return count
 }
 
 // Checks whether the string is a temperature and dew point values and writes this values
@@ -279,27 +287,6 @@ func (m *MetarMessage) setAltimetr(input string) bool {
 func (m *MetarMessage) appendRunwayVisualRange(input string) bool {
 	if RWYvis, ok := rwy.ParseVisibility(input); ok {
 		m.RWYvisibility = append(m.RWYvisibility, RWYvis)
-		return true
-	}
-	return false
-}
-
-func (m *MetarMessage) appendPhenomena(input string) bool {
-	if input == "//" {
-		m.PhenomenaNotDefined = true
-		return true
-	}
-	if p := ph.ParsePhenomena(input); p != nil {
-		m.Phenomena = append(m.Phenomena, *p)
-		return true
-	}
-	return false
-}
-
-func (m *MetarMessage) appendRecentPhenomena(input string) bool {
-
-	if p := ph.ParseRecentPhenomena(input); p != nil {
-		m.RecentPhenomena = append(m.RecentPhenomena, *p)
 		return true
 	}
 	return false
@@ -365,4 +352,32 @@ func (m *MetarMessage) appendWindShears(tokens []string, count int) (ok bool, to
 		}
 	}
 	return
+}
+
+type weatherCondition interface {
+	ParseVisibility([]string) int
+	AppendPhenomena(string) bool
+	setVerticalVisibility(string) bool
+	AppendCloud(string) bool
+}
+
+// decoder for not CAVOK conditions in TAF messages and trends. Returns new current position in []string
+func decodeWeatherCondition(t weatherCondition, count int, tokens []string) int {
+	// Horizontal visibility.
+	if count < len(tokens) {
+		count += t.ParseVisibility(tokens[count:])
+	}
+	// Weather or NSW - no significant weather
+	for count < len(tokens) && t.AppendPhenomena(tokens[count]) {
+		count++
+	}
+	// Vertical visibility
+	if count < len(tokens) && t.setVerticalVisibility(tokens[count]) {
+		count++
+	}
+	// Clouds.
+	for count < len(tokens) && t.AppendCloud(tokens[count]) {
+		count++
+	}
+	return count
 }
