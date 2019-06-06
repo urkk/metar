@@ -18,8 +18,10 @@ Suitable for the recognition messages from russians airports, and in the ex-USSR
         "github.com/urkk/metar"
     )
 
-    msg := metar.NewMETAR("URSS 220630Z 02003MPS 9999 -SHRA SCT050CB OVC086 20/16 Q1015 R02/290060 R06/290060 TEMPO -TSRA BKN030CB RMK R06/03002MPS QFE760")
-    fmt.Printf("%+v\n", msg)
+    msg, err := metar.NewMETAR("URSS 220630Z 02003MPS 9999 -SHRA SCT050CB OVC086 20/16 Q1015 R02/290060 R06/290060 TEMPO -TSRA BKN030CB RMK R06/03002MPS QFE760")
+    if err == nil {
+        fmt.Printf("%+v\n", msg)
+    }
 ```
 
 # Links
