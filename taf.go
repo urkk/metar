@@ -124,7 +124,13 @@ func (t *TAFMessage) addTempForecast(input string) bool {
 		}
 		tempf.IsMin = matches[1] == "N"
 		tempf.IsMax = matches[1] == "X"
-		tempf.DateTime, _ = time.Parse("2006010215Z", CurYearStr+CurMonthStr+matches[4])
+		if matches[4][2:] == "24Z" {
+			inputString := matches[4][:2] + "23"
+			tempf.DateTime, _ = time.Parse("2006010215", CurYearStr+CurMonthStr+inputString)
+			tempf.DateTime = tempf.DateTime.Add(time.Hour)
+		} else {
+			tempf.DateTime, _ = time.Parse("2006010215Z", CurYearStr+CurMonthStr+matches[4])
+		}
 		// if date in next month
 		if tempf.DateTime.Day() < t.DateTime.Day() {
 			tempf.DateTime = tempf.DateTime.AddDate(0, 1, 0)

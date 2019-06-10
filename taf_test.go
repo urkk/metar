@@ -151,6 +151,19 @@ var tafparsetests = []tafparsetest{
 				TemperatureForecast{Temp: 29, DateTime: time.Date(curYear, curMonth, 30, 12, 0, 0, 0, time.UTC), IsMax: true, IsMin: false},
 				TemperatureForecast{Temp: 16, DateTime: time.Date(curYear, curMonth+1, 1, 2, 0, 0, 0, time.UTC), IsMax: false, IsMin: true}},
 			NotDecodedTokens: nil}},
+	{"TAF ULLI 080756Z 0809/0909 18005MPS 9999 SCT025 TX30/0810Z TN18/0824Z",
+		&TAFMessage{rawData: "TAF ULLI 080756Z 0809/0909 18005MPS 9999 SCT025 TX30/0810Z TN18/0824Z",
+			COR: false, AMD: false, NIL: false, Station: "ULLI",
+			DateTime:   time.Date(curYear, curMonth, 8, 7, 56, 0, 0, time.UTC),
+			ValidFrom:  time.Date(curYear, curMonth, 8, 9, 0, 0, 0, time.UTC),
+			ValidTo:    time.Date(curYear, curMonth, 9, 9, 0, 0, 0, time.UTC),
+			Visibility: Visibility{Distance: 9999, LowerDistance: 0, LowerDirection: ""},
+			Wind:       getWind("18005MPS"),
+			Clouds:     []clouds.Cloud{getCloud("SCT025")},
+			Temperature: []TemperatureForecast{
+				TemperatureForecast{Temp: 30, DateTime: time.Date(curYear, curMonth, 8, 10, 0, 0, 0, time.UTC), IsMax: true, IsMin: false},
+				TemperatureForecast{Temp: 18, DateTime: time.Date(curYear, curMonth, 9, 0, 0, 0, 0, time.UTC), IsMax: false, IsMin: true}},
+			NotDecodedTokens: nil}},
 }
 
 func TestDecodeTAF(t *testing.T) {
