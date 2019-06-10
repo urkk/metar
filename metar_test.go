@@ -37,7 +37,6 @@ func TestParseVisibility(t *testing.T) {
 	for _, pair := range visibilityparsetests {
 		vis := &Visibility{}
 		tokensused := vis.ParseVisibility(pair.input)
-
 		if tokensused > 0 && !reflect.DeepEqual(vis, pair.expected) || tokensused != pair.tokens {
 			t.Error(
 				"For", pair.input,
@@ -46,6 +45,7 @@ func TestParseVisibility(t *testing.T) {
 			)
 		}
 	}
+
 }
 
 type remarksparsetest struct {

@@ -1,6 +1,8 @@
 package clouds
 
-import "testing"
+import (
+	"testing"
+)
 
 type testpair struct {
 	input             string
