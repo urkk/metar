@@ -15,7 +15,7 @@ func TestParseTrendData(t *testing.T) {
 		var input []string
 		var expected *Trend
 
-		Convey(`test incorrect time, horisontal visibility and phenomena`, func() {
+		Convey(`test incorrect time, horizontal visibility and phenomena`, func() {
 			input = []string{"BECMG", "2526/2526", "0500", "FG"}
 			expected = &Trend{Type: BECMG,
 				Visibility: Visibility{Distance: 500, LowerDistance: 0, LowerDirection: ""},
