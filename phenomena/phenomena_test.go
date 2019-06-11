@@ -1,84 +1,74 @@
 package phenomena
 
-import "testing"
+import (
+	"testing"
 
-type testpair struct {
-	input    string
-	expected *Phenomenon
-	correct  bool
-}
-
-var tests = []testpair{
-
-	// Vicinity     bool
-	// Intensity    Intensity
-	// Abbreviation string
-
-	{"PLRADZ", &Phenomenon{false, Moderate, "PLRADZ"}, true},
-	{"+SHRASNGS", &Phenomenon{false, Heavy, "SHRASNGS"}, true},
-	{"VCBLDU", &Phenomenon{true, Moderate, "BLDU"}, true},
-	// not can VC
-	{"VCSNDZ", &Phenomenon{true, Moderate, "VCSNDZ"}, false},
-	{"SHGRRA", &Phenomenon{false, Moderate, "SHGRRA"}, true},
-	// "Light" not be applicable
-	{"-FC", &Phenomenon{false, Light, "FC"}, false},
-	{"-PLDZ", &Phenomenon{false, Light, "PLDZ"}, true},
-}
-
-var recenttests = []testpair{
-
-	// Vicinity     bool
-	// Intensity    Intensity
-	// Abbreviation string
-
-	{"REFZDZ", &Phenomenon{false, Moderate, "FZDZ"}, true},
-	{"+REFZDZ", &Phenomenon{false, Heavy, "FZDZ"}, false},
-	{"RERASN", &Phenomenon{false, Moderate, "RASN"}, true},
-}
+	. "github.com/smartystreets/goconvey/convey"
+)
 
 func TestParsePhenomena(t *testing.T) {
 	arr := &Phenomena{}
-	for _, pair := range tests {
-		ph := ParsePhenomena(pair.input)
-		if pair.correct {
-			if *ph != *pair.expected {
-				t.Error(
-					"For", pair.input,
-					"expected", pair.expected,
-					"got", ph,
-				)
-			}
-			if !arr.AppendPhenomena(pair.input) {
-				t.Error("For", pair.input, "error append phenomenon")
-			}
-		} else if !pair.correct {
-			if ph != nil || arr.AppendPhenomena(pair.input) {
-				t.Error("false positive at " + pair.input)
-			}
-
-		}
+	type testpair struct {
+		input    string
+		expected *Phenomenon
 	}
+
+	var tests = []testpair{
+		// Vicinity     bool
+		// Intensity    Intensity
+		// Abbreviation string
+		{"PLRADZ", &Phenomenon{false, Moderate, "PLRADZ"}},
+		{"+SHRASNGS", &Phenomenon{false, Heavy, "SHRASNGS"}},
+		{"VCBLDU", &Phenomenon{true, Moderate, "BLDU"}},
+		// not can VC
+		{"VCSNDZ", nil},
+		{"SHGRRA", &Phenomenon{false, Moderate, "SHGRRA"}},
+		// "Light" not be applicable
+		{"-FC", nil},
+		{"-PLDZ", &Phenomenon{false, Light, "PLDZ"}},
+	}
+
+	Convey("Phenomena parsing tests", t, func() {
+		Convey("Phenomena must parsed correctly", func() {
+			for _, pair := range tests {
+				So(ParsePhenomena(pair.input), ShouldResemble, pair.expected)
+			}
+		})
+
+		Convey("Correct phenomena must can be appended", func() {
+			for _, pair := range tests {
+				So(arr.AppendPhenomena(pair.input), ShouldResemble, ParsePhenomena(pair.input) != nil)
+			}
+		})
+	})
+
 }
 
 func TestParseRecentPhenomena(t *testing.T) {
 	arr := &Phenomena{}
-	for _, pair := range recenttests {
-		ph := ParseRecentPhenomena(pair.input)
-		if pair.correct {
-			if *ph != *pair.expected {
-				t.Error(
-					"For", pair.input,
-					"expected", pair.expected,
-					"got", ph,
-				)
-			}
-			if !arr.AppendRecentPhenomena(pair.input) {
-				t.Error("For", pair.input, "error append phenomenon")
-			}
-		} else if !pair.correct {
-			if ph != nil || arr.AppendRecentPhenomena(pair.input) {
-				t.Error("false positive at " + pair.input)
-			}
-		}
+
+	type testpair struct {
+		input    string
+		expected *Phenomenon
 	}
+	var recenttests = []testpair{
+		{"REFZDZ", &Phenomenon{false, Moderate, "FZDZ"}},
+		{"+REFZDZ", nil}, // + not applicable in recent weather
+		{"RERASN", &Phenomenon{false, Moderate, "RASN"}},
+	}
+
+	Convey("Recent phenomena parsing tests", t, func() {
+		Convey("Recent phenomena must parsed correctly", func() {
+			for _, pair := range recenttests {
+				So(ParseRecentPhenomena(pair.input), ShouldResemble, pair.expected)
+			}
+		})
+
+		Convey("Correct recent phenomena must can be appended", func() {
+			for _, pair := range recenttests {
+				So(arr.AppendRecentPhenomena(pair.input), ShouldResemble, ParseRecentPhenomena(pair.input) != nil)
+			}
+		})
+
+	})
 }

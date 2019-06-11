@@ -1,113 +1,59 @@
 package wind
 
 import (
-	"reflect"
 	"testing"
+
+	. "github.com/smartystreets/goconvey/convey"
+	. "github.com/urkk/metar/conversion"
 )
 
-type parsetest struct {
-	input    string
-	expected *Wind
-}
-
-var parsetests = []parsetest{
-	// Speed         int
-	// WindDirection int
-	// GustsSpeed    int
-	// Variable      bool
-	// VariableFrom  int
-	// VariableTo    int
-	// Above50MPS    bool
-	{"31005MPS", &Wind{310, 5, 0, false, 0, 0, false}},
-	{"31010KPH", &Wind{310, 2.7777777777777777, 0, false, 0, 0, false}},
-	{"VRB15MPS", &Wind{0, 15, 0, true, 0, 0, false}},
-	{"00000MPS", &Wind{0, 0, 0, false, 0, 0, false}},
-	{"240P49MPS", &Wind{240, 49, 0, false, 0, 0, true}},
-	{"04008G20MPS", &Wind{40, 8, 20, false, 0, 0, false}},
-	{"22003G08MPS 280V350", &Wind{220, 3, 8, false, 280, 350, false}},
-	{"14010KT", &Wind{140, 5.144456333854638, 0, false, 0, 0, false}},
-	{"BKN020", &Wind{0, 0, 0, false, 0, 0, false}},
-}
-
-type functest struct {
-	input            Wind
-	expectedKt       int
-	expectedMps      int
-	expectedGustsKt  int
-	expectedGustsMps int
-}
-
-var functests = []functest{
-	{Wind{0, 10, 0, false, 0, 0, false}, 19, 10, 0, 0},
-	{Wind{0, 0, 0, false, 0, 0, false}, 0, 0, 0, 0},
-	{Wind{0, 15, 0, false, 0, 0, false}, 29, 15, 0, 0},
-	{Wind{0, 7.33, 0, false, 0, 0, false}, 14, 7, 0, 0},
-	{Wind{0, 10, 10, false, 0, 0, false}, 19, 10, 19, 10},
-	{Wind{0, 15, 15, false, 0, 0, false}, 29, 15, 29, 15},
-}
-
 func TestParseWind(t *testing.T) {
-	for _, pair := range parsetests {
-		wnd := &Wind{}
-		tokensused := wnd.ParseWind(pair.input)
-		if tokensused > 0 && !reflect.DeepEqual(wnd, pair.expected) {
-			t.Error(
-				"For", pair.input,
-				"expected", pair.expected,
-				"got", wnd,
-			)
-		}
-	}
-}
 
-func TestSpeedKt(t *testing.T) {
-	for _, pair := range functests {
-		vkt := pair.input.SpeedKt()
-		if vkt != pair.expectedKt {
-			t.Error(
-				"For", pair.input,
-				"expected", pair.expectedKt,
-				"got", vkt,
-			)
-		}
+	type testpair struct {
+		input    string
+		expected *Wind
+		tokens   int
 	}
-}
 
-func TestSpeedMps(t *testing.T) {
-	for _, pair := range functests {
-		vmps := pair.input.SpeedMps()
-		if vmps != pair.expectedMps {
-			t.Error(
-				"For", pair.input,
-				"expected", pair.expectedMps,
-				"got", vmps,
-			)
-		}
+	var windtests = []testpair{
+		{"31005MPS", &Wind{310, 5, 0, false, 0, 0, false}, 1},
+		{"31010KPH", &Wind{310, 2.7777777777777777, 0, false, 0, 0, false}, 1},
+		{"VRB15MPS", &Wind{0, 15, 0, true, 0, 0, false}, 1},
+		{"00000MPS", &Wind{0, 0, 0, false, 0, 0, false}, 1},
+		{"240P49MPS", &Wind{240, 49, 0, false, 0, 0, true}, 1},
+		{"04008G20MPS", &Wind{40, 8, 20, false, 0, 0, false}, 1},
+		{"22003G08MPS 280V350", &Wind{220, 3, 8, false, 280, 350, false}, 2},
+		{"14010KT", &Wind{140, 5.144456333854638, 0, false, 0, 0, false}, 1},
+		{"BKN020", &Wind{0, 0, 0, false, 0, 0, false}, 0},
 	}
-}
 
-func TestGustsSpeedMps(t *testing.T) {
-	for _, pair := range functests {
-		vmps := pair.input.GustsSpeedMps()
-		if vmps != pair.expectedGustsMps {
-			t.Error(
-				"For", pair.input,
-				"expected", pair.expectedGustsMps,
-				"got", vmps,
-			)
-		}
-	}
-}
+	Convey("Wind parsing tests", t, func() {
+		Convey("wind must parsed correctly", func() {
+			for _, pair := range windtests {
+				wnd := &Wind{}
+				tokensused := wnd.ParseWind(pair.input)
+				So(wnd, ShouldResemble, pair.expected)
+				So(tokensused, ShouldEqual, pair.tokens)
+			}
+		})
 
-func TestGustsSpeedKt(t *testing.T) {
-	for _, pair := range functests {
-		vmps := pair.input.GustsSpeedKt()
-		if vmps != pair.expectedGustsKt {
-			t.Error(
-				"For", pair.input,
-				"expected", pair.expectedGustsKt,
-				"got", vmps,
-			)
-		}
-	}
+		Convey("speed and gusts speed in meters per second must calculated correctly", func() {
+			for _, pair := range windtests {
+				wnd := &Wind{}
+				wnd.ParseWind(pair.input)
+				So(wnd.SpeedMps(), ShouldAlmostEqual, wnd.speed, .25)
+				So(wnd.GustsSpeedMps(), ShouldAlmostEqual, wnd.gustsSpeed, .25)
+			}
+		})
+
+		Convey("speed and gusts speed in knots must calculated correctly", func() {
+			for _, pair := range windtests {
+				wnd := &Wind{}
+				wnd.ParseWind(pair.input)
+				So(wnd.SpeedKt(), ShouldAlmostEqual, MpsToKts(wnd.speed), 1)
+				So(wnd.GustsSpeedKt(), ShouldAlmostEqual, MpsToKts(wnd.gustsSpeed), 1)
+			}
+		})
+
+	})
 }
