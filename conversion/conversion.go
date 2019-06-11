@@ -20,8 +20,8 @@ func MpsToKts(m float64) float64 {
 }
 
 // SMileToM - converts statute miles to meters
-func SMileToM(sm int) int {
-	return int(math.Round(float64(sm) * 1609.344))
+func SMileToM(sm float64) int {
+	return int(math.Round(sm * 1609.344))
 }
 
 // FtToM - converts feet to meters (rounded to 10 meters)

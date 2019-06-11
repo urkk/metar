@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/smartystreets/goconvey/convey"
 	"github.com/urkk/metar/clouds"
 	. "github.com/urkk/metar/phenomena"
 	"github.com/urkk/metar/runways"
@@ -15,79 +16,67 @@ var curYear = time.Now().Year()
 var curMonth = time.Now().Month()
 var curDay = time.Now().Day()
 
-type visibilityparsetest struct {
-	input    []string
-	expected *Visibility
-	tokens   int
-}
-
-var visibilityparsetests = []visibilityparsetest{
-	// Distance       int
-	// LowerDistance  int
-	// LowerDirection string
-
-	{[]string{"2000"}, &Visibility{2000, 0, ""}, 1},
-	{[]string{"3000", "1500NE"}, &Visibility{3000, 1500, "NE"}, 2},
-	{[]string{"1500", "1000S"}, &Visibility{1500, 1000, "S"}, 2},
-	{[]string{"9999"}, &Visibility{9999, 0, ""}, 1},
-	{[]string{"20008MPS"}, &Visibility{0, 0, ""}, 0},
-}
-
 func TestParseVisibility(t *testing.T) {
-	for _, pair := range visibilityparsetests {
-		vis := &Visibility{}
-		tokensused := vis.ParseVisibility(pair.input)
 
-		if tokensused > 0 && !reflect.DeepEqual(vis, pair.expected) || tokensused != pair.tokens {
-			t.Error(
-				"For", pair.input,
-				"expected", pair.expected,
-				"got", vis,
-			)
-		}
+	type testpair struct {
+		input    []string
+		expected *Visibility
 	}
-}
 
-type remarksparsetest struct {
-	input    []string
-	expected Remark
+	var onetokenpair = []testpair{
+		{[]string{"2000"}, &Visibility{2000, 0, ""}},
+		{[]string{"9999"}, &Visibility{9999, 0, ""}},
+		{[]string{"5500"}, &Visibility{5500, 0, ""}},
+	}
+
+	var twotokenpair = []testpair{
+		{[]string{"3000", "1500NE"}, &Visibility{3000, 1500, "NE"}},
+		{[]string{"1500", "1000S"}, &Visibility{1500, 1000, "S"}},
+		{[]string{"7000", "5000W"}, &Visibility{7000, 5000, "W"}},
+	}
+
+	var incorrecttokenpair = []testpair{
+		{[]string{"20008MPS"}, &Visibility{0, 0, ""}},
+		{[]string{"OVC020"}, &Visibility{0, 0, ""}},
+	}
+
+	Convey("Prevailing visibility parsing tests", t, func() {
+		vis := &Visibility{}
+		Convey("One token testing", func() {
+			var t int
+			for _, pair := range onetokenpair {
+				t = vis.ParseVisibility(pair.input)
+				So(vis, ShouldResemble, pair.expected)
+				So(t, ShouldEqual, 1)
+			}
+		})
+
+		Convey("Two token testing", func() {
+			var t int
+			for _, pair := range twotokenpair {
+				t = vis.ParseVisibility(pair.input)
+				So(vis, ShouldResemble, pair.expected)
+				So(t, ShouldEqual, 2)
+			}
+		})
+
+		Convey("Incorrect token testing", func() {
+			var t int
+			for _, pair := range incorrecttokenpair {
+				t = vis.ParseVisibility(pair.input)
+				So(vis, ShouldResemble, pair.expected)
+				So(t, ShouldEqual, 0)
+			}
+		})
+
+	})
+
 }
 
 func getWind(inp string) wind.Wind {
 	w := &wind.Wind{}
 	w.ParseWind(inp)
 	return *w
-}
-
-var remarksparsetests = []remarksparsetest{
-	// WindOnRWY []WindOnRWY
-	// QBB       int  // cloud base in meters
-	// МТOBSC    bool // Mountains obscured
-	// MASTOBSC  bool // Mast obscured
-	// OBSTOBSC  bool // Obstacle obscured
-	// QFE       int  // Q-code Field Elevation (mmHg/hPa)
-
-	{[]string{"RMK", "R06/25002MPS", "QFE762"}, Remark{WindOnRWY: []WindOnRWY{WindOnRWY{Runway: "06", Wind: getWind("25002MPS")}}, QBB: 0, МТOBSC: false, MASTOBSC: false, OBSTOBSC: false, QFE: 762}},
-	{[]string{"QBB200", "MT", "OBSC", "QFE762"}, Remark{WindOnRWY: nil, QBB: 200, МТOBSC: true, MASTOBSC: false, OBSTOBSC: false, QFE: 762}},
-	{[]string{"QBB180"}, Remark{WindOnRWY: nil, QBB: 180, МТOBSC: false, MASTOBSC: false, OBSTOBSC: false, QFE: 0}},
-	{[]string{"MT", "OBSC", "MAST", "OBSC", "OBST", "OBSC", "QFE762/1004"}, Remark{WindOnRWY: nil, QBB: 0, МТOBSC: true, MASTOBSC: true, OBSTOBSC: true, QFE: 762}},
-	{[]string{"MT", "OBSC"}, Remark{WindOnRWY: nil, QBB: 0, МТOBSC: true, MASTOBSC: false, OBSTOBSC: false, QFE: 0}},
-	{[]string{"MAST", "OBSC"}, Remark{WindOnRWY: nil, QBB: 0, МТOBSC: false, MASTOBSC: true, OBSTOBSC: false, QFE: 0}},
-	{[]string{"OBST", "OBSC"}, Remark{WindOnRWY: nil, QBB: 0, МТOBSC: false, MASTOBSC: false, OBSTOBSC: true, QFE: 0}},
-	{[]string{"RMK", "R06/25002MPS", "120V180"}, Remark{WindOnRWY: []WindOnRWY{WindOnRWY{Runway: "06", Wind: getWind("25002MPS 120V180")}}, QBB: 0, МТOBSC: false, MASTOBSC: false, OBSTOBSC: false, QFE: 0}},
-}
-
-func TestParseRemarks(t *testing.T) {
-	for _, pair := range remarksparsetests {
-		r := *parseRemarks(pair.input)
-		if !reflect.DeepEqual(r, pair.expected) {
-			t.Error(
-				"For", pair.input,
-				"expected", pair.expected,
-				"got", r,
-			)
-		}
-	}
 }
 
 type metarparsetest struct {
