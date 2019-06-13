@@ -73,7 +73,7 @@ func ParseCloud(token string) (cl Cloud, ok bool) {
 		return cl, true
 	}
 
-	if matches[2] != "///" {
+	if matches[2] != "///" && matches[2] != "" {
 		cl.height, _ = strconv.Atoi(matches[2])
 	} else {
 		cl.HeightNotDefined = true

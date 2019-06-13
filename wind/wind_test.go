@@ -16,15 +16,16 @@ func TestParseWind(t *testing.T) {
 	}
 
 	var windtests = []testpair{
-		{"31005MPS", &Wind{310, 5, 0, false, 0, 0, false}, 1},
-		{"31010KPH", &Wind{310, 2.7777777777777777, 0, false, 0, 0, false}, 1},
-		{"VRB15MPS", &Wind{0, 15, 0, true, 0, 0, false}, 1},
-		{"00000MPS", &Wind{0, 0, 0, false, 0, 0, false}, 1},
-		{"240P49MPS", &Wind{240, 49, 0, false, 0, 0, true}, 1},
-		{"04008G20MPS", &Wind{40, 8, 20, false, 0, 0, false}, 1},
-		{"22003G08MPS 280V350", &Wind{220, 3, 8, false, 280, 350, false}, 2},
-		{"14010KT", &Wind{140, 5.144456333854638, 0, false, 0, 0, false}, 1},
-		{"BKN020", &Wind{0, 0, 0, false, 0, 0, false}, 0},
+		{"31005MPS", &Wind{310, 5, 0, false, 0, 0, false, false, false}, 1},
+		{"31010KPH", &Wind{310, 2.7777777777777777, 0, false, 0, 0, false, false, false}, 1},
+		{"VRB15MPS", &Wind{0, 15, 0, true, 0, 0, false, false, false}, 1},
+		{"00000MPS", &Wind{0, 0, 0, false, 0, 0, false, false, false}, 1},
+		{"240P49MPS", &Wind{240, 49, 0, false, 0, 0, true, false, false}, 1},
+		{"04008G20MPS", &Wind{40, 8, 20, false, 0, 0, false, false, false}, 1},
+		{"22003G08MPS 280V350", &Wind{220, 3, 8, false, 280, 350, false, false, false}, 2},
+		{"14010KT", &Wind{140, 5.144456333854638, 0, false, 0, 0, false, false, false}, 1},
+		{"/////KT", &Wind{0, 0, 0, false, 0, 0, false, true, true}, 1},
+		{"BKN020", &Wind{0, 0, 0, false, 0, 0, false, false, false}, 0},
 	}
 
 	Convey("Wind parsing tests", t, func() {

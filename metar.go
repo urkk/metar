@@ -105,11 +105,14 @@ func NewMETAR(inputtext string) (*MetarMessage, error) {
 	var trends [][]string
 	var remarks []string
 	// split the array of tokens to parts: main section, remarks and trends
+	// First, let's remove the RMK group, as it can contain TEMPO (RMK WHT TEMPO GRN)
 	for i := totalcount - 1; i > count; i-- {
 		if tokens[i] == "RMK" {
 			remarks = append(remarks, tokens[i:totalcount]...)
 			totalcount = i
 		}
+	}
+	for i := totalcount - 1; i > count; i-- {
 		if tokens[i] == TEMPO || tokens[i] == BECMG {
 			//for correct order of following on reverse parsing append []trends to current trend
 			trends = append([][]string{tokens[i:totalcount]}, trends[0:]...)
