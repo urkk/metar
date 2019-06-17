@@ -8,6 +8,7 @@ import (
 
 	"github.com/urkk/metar/clouds"
 	ph "github.com/urkk/metar/phenomena"
+	v "github.com/urkk/metar/visibility"
 	"github.com/urkk/metar/wind"
 )
 
@@ -35,7 +36,7 @@ type TAFMessage struct {
 	// Ceiling And Visibility OK, indicating no cloud below 5,000 ft (1,500 m) or the highest minimum sector
 	// altitude and no cumulonimbus or towering cumulus at any level, a visibility of 10 km (6 mi) or more and no significant weather change.
 	CAVOK              bool
-	Visibility                               // Horizontal visibility
+	v.Visibility                             // Horizontal visibility
 	ph.Phenomena                             // Present Weather
 	VerticalVisibility int                   // Vertical visibility (ft)
 	clouds.Clouds                            // Cloud amount and height

@@ -8,6 +8,7 @@ import (
 
 	"github.com/urkk/metar/clouds"
 	ph "github.com/urkk/metar/phenomena"
+	v "github.com/urkk/metar/visibility"
 	"github.com/urkk/metar/wind"
 )
 
@@ -32,7 +33,7 @@ type Trend struct {
 	FM time.Time // FroM (time)
 	TL time.Time // unTiL (time)
 	AT time.Time // AT time
-	Visibility
+	v.Visibility
 	VerticalVisibility           int
 	VerticalVisibilityNotDefined bool
 	wind.Wind

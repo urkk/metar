@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
+	. "github.com/urkk/metar/visibility"
 )
 
 func TestParseVisibility(t *testing.T) {
@@ -13,18 +14,38 @@ func TestParseVisibility(t *testing.T) {
 	}
 
 	var tests = []testpair{
-		{"R25/M0075", VisualRange{RunwayDesignator{"25", false}, 75, false, true, NotDefined}},
-		{"R33L/P1500", VisualRange{RunwayDesignator{"33L", false}, 1500, true, false, NotDefined}},
-		{"R16R/1000U", VisualRange{RunwayDesignator{"16R", false}, 1000, false, false, U}},
+		{"R25/M0075", VisualRange{Designator: RunwayDesignator{"25", false},
+			Visibility:     BaseVisibility{Distance: Distance{Value: 75, FractionValue: 0.0, Unit: ""}, AboveMax: false, BelowMin: true},
+			UpToVisibility: BaseVisibility{}, Trend: NotDefined}},
+		{"R33L/P1500", VisualRange{Designator: RunwayDesignator{"33L", false},
+			Visibility:     BaseVisibility{Distance: Distance{Value: 1500, FractionValue: 0.0, Unit: ""}, AboveMax: true, BelowMin: false},
+			UpToVisibility: BaseVisibility{}, Trend: NotDefined}},
+		{"R16R/1000U", VisualRange{Designator: RunwayDesignator{"16R", false},
+			Visibility:     BaseVisibility{Distance: Distance{Value: 1000, FractionValue: 0.0, Unit: ""}, AboveMax: false, BelowMin: false},
+			UpToVisibility: BaseVisibility{}, Trend: U}},
 		//artificial situation
-		{"R88/1000D", VisualRange{RunwayDesignator{"88", true}, 1000, false, false, D}},
-		{"R33C/0900N", VisualRange{RunwayDesignator{"33C", false}, 900, false, false, N}},
-		{"OVC350", VisualRange{RunwayDesignator{"", false}, 0, false, false, NotDefined}},
+		{"R88/1000D", VisualRange{Designator: RunwayDesignator{"88", true},
+			Visibility:     BaseVisibility{Distance: Distance{Value: 1000, FractionValue: 0.0, Unit: ""}, AboveMax: false, BelowMin: false},
+			UpToVisibility: BaseVisibility{}, Trend: D}},
+		{"R33C/0900N", VisualRange{Designator: RunwayDesignator{"33C", false},
+			Visibility:     BaseVisibility{Distance: Distance{Value: 900, FractionValue: 0.0, Unit: ""}, AboveMax: false, BelowMin: false},
+			UpToVisibility: BaseVisibility{}, Trend: N}},
+		{"R06/P6000FT", VisualRange{Designator: RunwayDesignator{"06", false},
+			Visibility:     BaseVisibility{Distance: Distance{Value: 6000, FractionValue: 0.0, Unit: "FT"}, AboveMax: true, BelowMin: false},
+			UpToVisibility: BaseVisibility{}, Trend: NotDefined}},
+		{"R32/2200V4000FT", VisualRange{Designator: RunwayDesignator{"32", false},
+			Visibility:     BaseVisibility{Distance: Distance{Value: 2200, FractionValue: 0.0, Unit: "FT"}, AboveMax: false, BelowMin: false},
+			UpToVisibility: BaseVisibility{Distance: Distance{Value: 4000, FractionValue: 0.0, Unit: "FT"}, AboveMax: false, BelowMin: false}, Trend: NotDefined}},
+		{"R35/4500VP6000FT/D", VisualRange{Designator: RunwayDesignator{"35", false},
+			Visibility:     BaseVisibility{Distance: Distance{Value: 4500, FractionValue: 0.0, Unit: "FT"}, AboveMax: false, BelowMin: false},
+			UpToVisibility: BaseVisibility{Distance: Distance{Value: 6000, FractionValue: 0.0, Unit: "FT"}, AboveMax: true, BelowMin: false}, Trend: D}},
+
+		{"OVC350", VisualRange{Designator: RunwayDesignator{"", false}, Visibility: BaseVisibility{}, UpToVisibility: BaseVisibility{}, Trend: NotDefined}},
 	}
 
 	Convey("Runway visual range parsing tests", t, func() {
 		for _, pair := range tests {
-			vis, _ := ParseVisibility(pair.input)
+			vis, _ := ParseVisualRange(pair.input)
 			So(vis, ShouldResemble, pair.expected)
 		}
 	})

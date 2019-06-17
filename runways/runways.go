@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+
+	vis "github.com/urkk/metar/visibility"
 )
 
 // VRTendency - average runway visual range tendency
@@ -44,11 +46,10 @@ func NewRD(number string) (rd RunwayDesignator) {
 
 // VisualRange - describes the horizontal distance you can expect to see down a runway
 type VisualRange struct {
-	Designator RunwayDesignator
-	Distance   int
-	AboveMax   bool
-	BelowMin   bool
-	Trend      VRTendency
+	Designator     RunwayDesignator
+	Visibility     vis.BaseVisibility
+	UpToVisibility vis.BaseVisibility
+	Trend          VRTendency
 }
 
 // State - runway condition representation
@@ -67,20 +68,31 @@ type State struct {
 	SNOCLO                      bool
 }
 
-// ParseVisibility - identify and parses the representation of runway visual range
-func ParseVisibility(token string) (v VisualRange, result bool) {
+// ParseVisualRange - identify and parses the representation of runway visual range
+func ParseVisualRange(token string) (v VisualRange, result bool) {
 	// TODO 0800V1000FT			R27/0150V0300U
-	pattern := `^(R\d{2}[LCR]?)/(M|P)?(\d{4})(U|D|N)?`
-	if matched, _ := regexp.MatchString(pattern, token); !matched {
+	//pattern := `^(R\d{2}[LCR]?)/(M|P)?(\d{4})(U|D|N)?`
+	regex := regexp.MustCompile(`^(R\d{2}[LCR]?)/(M|P)?(\d{4})(V(M|P)?(\d{4}))?(FT)?/?(U|D|N)?`)
+	if matched := regex.MatchString(token); !matched {
 		return v, false
 	}
-	regex := regexp.MustCompile(pattern)
 	matches := regex.FindStringSubmatch(token)
 	v.Designator = NewRD(matches[1][1:])
-	v.AboveMax = matches[2] == "P" // plus
-	v.BelowMin = matches[2] == "M" // minus
-	v.Distance, _ = strconv.Atoi(matches[3])
-	v.Trend = VRTendency(matches[4])
+	v.Visibility.AboveMax = matches[2] == "P" // plus
+	v.Visibility.BelowMin = matches[2] == "M" // minus
+	v.Visibility.Distance.Value, _ = strconv.Atoi(matches[3])
+	if matches[7] == "FT" {
+		v.Visibility.Distance.Unit = vis.FT
+	}
+	if matches[4] != "" {
+		if matches[7] == "FT" {
+			v.UpToVisibility.Unit = vis.FT
+		}
+		v.UpToVisibility.Value, _ = strconv.Atoi(matches[6])
+		v.UpToVisibility.AboveMax = matches[5] == "P" // plus
+		v.UpToVisibility.BelowMin = matches[5] == "M" // minus
+	}
+	v.Trend = VRTendency(matches[8])
 	return v, true
 }
 

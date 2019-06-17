@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/smartystreets/goconvey/convey"
+	//	. "github.com/smartystreets/goconvey/convey"
 	"github.com/urkk/metar/clouds"
 	. "github.com/urkk/metar/phenomena"
 	"github.com/urkk/metar/runways"
+	v "github.com/urkk/metar/visibility"
 	"github.com/urkk/metar/wind"
 )
 
@@ -16,67 +17,16 @@ var curYear = time.Now().Year()
 var curMonth = time.Now().Month()
 var curDay = time.Now().Day()
 
-func TestParseVisibility(t *testing.T) {
-
-	type testpair struct {
-		input    []string
-		expected *Visibility
-	}
-
-	var onetokenpair = []testpair{
-		{[]string{"2000"}, &Visibility{2000, 0, ""}},
-		{[]string{"9999"}, &Visibility{9999, 0, ""}},
-		{[]string{"5500"}, &Visibility{5500, 0, ""}},
-	}
-
-	var twotokenpair = []testpair{
-		{[]string{"3000", "1500NE"}, &Visibility{3000, 1500, "NE"}},
-		{[]string{"1500", "1000S"}, &Visibility{1500, 1000, "S"}},
-		{[]string{"7000", "5000W"}, &Visibility{7000, 5000, "W"}},
-	}
-
-	var incorrecttokenpair = []testpair{
-		{[]string{"20008MPS"}, &Visibility{0, 0, ""}},
-		{[]string{"OVC020"}, &Visibility{0, 0, ""}},
-	}
-
-	Convey("Prevailing visibility parsing tests", t, func() {
-		vis := &Visibility{}
-		Convey("One token testing", func() {
-			var t int
-			for _, pair := range onetokenpair {
-				t = vis.ParseVisibility(pair.input)
-				So(vis, ShouldResemble, pair.expected)
-				So(t, ShouldEqual, 1)
-			}
-		})
-
-		Convey("Two token testing", func() {
-			var t int
-			for _, pair := range twotokenpair {
-				t = vis.ParseVisibility(pair.input)
-				So(vis, ShouldResemble, pair.expected)
-				So(t, ShouldEqual, 2)
-			}
-		})
-
-		Convey("Incorrect token testing", func() {
-			var t int
-			for _, pair := range incorrecttokenpair {
-				t = vis.ParseVisibility(pair.input)
-				So(vis, ShouldResemble, pair.expected)
-				So(t, ShouldEqual, 0)
-			}
-		})
-
-	})
-
-}
-
 func getWind(inp string) wind.Wind {
 	w := &wind.Wind{}
 	w.ParseWind(inp)
 	return *w
+}
+
+func getVis(inp []string) v.Visibility {
+	vis := &v.Visibility{}
+	vis.ParseVisibility(inp)
+	return *vis
 }
 
 type metarparsetest struct {
@@ -91,7 +41,7 @@ var metarparsetests = []metarparsetest{
 			Station:                      "URSS",
 			DateTime:                     time.Date(curYear, curMonth, 27, 6, 0, 0, 0, time.UTC),
 			Wind:                         getWind("22003MPS"),
-			Visibility:                   Visibility{Distance: 9999, LowerDistance: 0, LowerDirection: ""},
+			Visibility:                   getVis([]string{"9999"}),
 			VerticalVisibilityNotDefined: true,
 			Phenomena:                    []Phenomenon{Phenomenon{Vicinity: true, Intensity: "", Abbreviation: "FG"}},
 			Temperature:                  17,
@@ -104,7 +54,7 @@ var metarparsetests = []metarparsetest{
 			Station:     "URSS",
 			DateTime:    time.Date(curYear, curMonth, 27, 6, 0, 0, 0, time.UTC),
 			Wind:        getWind("22003MPS"),
-			Visibility:  Visibility{Distance: 9999, LowerDistance: 0, LowerDirection: ""},
+			Visibility:  getVis([]string{"9999"}),
 			Phenomena:   []Phenomenon{Phenomenon{Vicinity: true, Intensity: "", Abbreviation: "FG"}},
 			Clouds:      []clouds.Cloud{getCloud("NSC")},
 			Temperature: 17,
@@ -117,7 +67,6 @@ var metarparsetests = []metarparsetest{
 			Station:     "URSS",
 			DateTime:    time.Date(curYear, curMonth, 27, 6, 0, 0, 0, time.UTC),
 			Wind:        getWind("22003MPS"),
-			Visibility:  Visibility{Distance: 0, LowerDistance: 0, LowerDirection: ""},
 			CAVOK:       true,
 			Temperature: -17,
 			Dewpoint:    -11,
@@ -130,7 +79,6 @@ var metarparsetests = []metarparsetest{
 			Station:     "URSS",
 			DateTime:    time.Date(curYear, curMonth, 27, 6, 0, 0, 0, time.UTC),
 			Wind:        getWind("22003MPS"),
-			Visibility:  Visibility{Distance: 0, LowerDistance: 0, LowerDirection: ""},
 			CAVOK:       true,
 			Temperature: -17,
 			Dewpoint:    -11,
@@ -140,7 +88,7 @@ var metarparsetests = []metarparsetest{
 			TREND: []Trend{Trend{
 				Type:               TEMPO,
 				Wind:               getWind("32010G17MPS"),
-				Visibility:         Visibility{Distance: 8000, LowerDistance: 0, LowerDirection: ""},
+				Visibility:         getVis([]string{"8000"}),
 				Phenomena:          []Phenomenon{Phenomenon{Vicinity: false, Abbreviation: "FG", Intensity: ""}},
 				VerticalVisibility: 8000,
 			},
@@ -153,15 +101,18 @@ var metarparsetests = []metarparsetest{
 			Station:    "URSS",
 			DateTime:   time.Date(curYear, curMonth, 27, 6, 0, 0, 0, time.UTC),
 			Wind:       getWind("22003MPS 180V250"),
-			Visibility: Visibility{Distance: 5000, LowerDistance: 4000, LowerDirection: "NW"},
-			RWYvisibility: []runways.VisualRange{runways.VisualRange{Designator: runways.RunwayDesignator{Number: "24", AllRunways: false},
-				Distance: 2000,
-				AboveMax: true,
-				Trend:    ""},
-				runways.VisualRange{Designator: runways.RunwayDesignator{Number: "30", AllRunways: false},
-					Distance: 6000,
-					AboveMax: false,
-					Trend:    ""},
+			Visibility: getVis([]string{"5000", "4000NW"}),
+			RWYvisibility: []runways.VisualRange{
+				runways.VisualRange{
+					Designator:     runways.RunwayDesignator{Number: "24", AllRunways: false},
+					Visibility:     v.BaseVisibility{Distance: v.Distance{Value: 2000, FractionValue: 0.0, Unit: ""}, AboveMax: true, BelowMin: false},
+					UpToVisibility: v.BaseVisibility{},
+					Trend:          runways.NotDefined},
+				runways.VisualRange{
+					Designator:     runways.RunwayDesignator{Number: "30", AllRunways: false},
+					Visibility:     v.BaseVisibility{Distance: v.Distance{Value: 6000, FractionValue: 0.0, Unit: ""}, AboveMax: false, BelowMin: false},
+					UpToVisibility: v.BaseVisibility{},
+					Trend:          runways.NotDefined},
 			},
 			PhenomenaNotDefined: true,
 			VerticalVisibility:  10000,
@@ -179,7 +130,7 @@ var metarparsetests = []metarparsetest{
 			Station:     "UHMM",
 			DateTime:    time.Date(curYear, curMonth, 24, 7, 0, 0, 0, time.UTC),
 			Wind:        getWind("11006MPS"),
-			Visibility:  Visibility{Distance: 9999, LowerDistance: 0, LowerDirection: ""},
+			Visibility:  getVis([]string{"9999"}),
 			Clouds:      clouds.Clouds{getCloud("SCT011"), getCloud("OVC018CB")},
 			Temperature: 5,
 			Dewpoint:    4,
@@ -192,6 +143,25 @@ var metarparsetests = []metarparsetest{
 			Station:  "UOOO",
 			DateTime: time.Date(curYear, curMonth, 5, 20, 30, 0, 0, time.UTC),
 			NIL:      true,
+		}},
+	{"CYRB 131300Z 28006KT 6SM R35/4500VP6000FT/D BR FEW002 SCT038 BKN060 M02/M02 A2983",
+		&MetarMessage{rawData: "CYRB 131300Z 28006KT 6SM R35/4500VP6000FT/D BR FEW002 SCT038 BKN060 M02/M02 A2983",
+			Station:    "CYRB",
+			DateTime:   time.Date(curYear, curMonth, 13, 13, 0, 0, 0, time.UTC),
+			Wind:       getWind("28006KT"),
+			Visibility: getVis([]string{"6SM"}),
+			RWYvisibility: []runways.VisualRange{
+				runways.VisualRange{
+					Designator:     runways.RunwayDesignator{Number: "35", AllRunways: false},
+					Visibility:     v.BaseVisibility{Distance: v.Distance{Value: 4500, FractionValue: 0.0, Unit: "FT"}, AboveMax: false, BelowMin: false},
+					UpToVisibility: v.BaseVisibility{Distance: v.Distance{Value: 6000, FractionValue: 0.0, Unit: "FT"}, AboveMax: true, BelowMin: false},
+					Trend:          runways.D},
+			},
+			Clouds:      clouds.Clouds{getCloud("FEW002"), getCloud("SCT038"), getCloud("BKN060")},
+			Phenomena:   []Phenomenon{Phenomenon{Vicinity: false, Abbreviation: "BR", Intensity: ""}},
+			Temperature: -2,
+			Dewpoint:    -2,
+			QNHhPa:      1010,
 		}},
 }
 

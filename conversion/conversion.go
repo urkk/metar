@@ -5,8 +5,13 @@ import (
 )
 
 // KphToMps - converts kilometres per hour to meters per second
-func KphToMps(kph float64) float64 {
-	return kph / 3.6
+func KphToMps(kph int) float64 {
+	return float64(kph) / 3.6
+}
+
+// KphToKts - converts kilometres per hour to knots
+func KphToKts(kph int) float64 {
+	return float64(kph) / 1.852
 }
 
 // KtsToMps - converts knots to meters per second
@@ -27,6 +32,26 @@ func SMileToM(sm float64) int {
 // FtToM - converts feet to meters (rounded to 10 meters)
 func FtToM(ft int) int {
 	return int(math.Round(float64(ft)*0.3048/10) * 10)
+}
+
+// MToFt - converts metres to feet (rounded to 10)
+func MToFt(m int) int {
+	return int(math.Round(float64(m)*3.28084/10) * 10)
+}
+
+// MToSMile - converts metres to statute miles
+func MToSMile(m int) float64 {
+	return float64(m) * 0.00062137119223733
+}
+
+// FtToSMile - converts feet to statute miles
+func FtToSMile(m int) float64 {
+	return float64(m) / 5280
+}
+
+// SMileToFt - converts statute miles to feet
+func SMileToFt(m float64) int {
+	return int(m * 5280)
 }
 
 // InHgTohPa - converts inch of mercury to hectopascal

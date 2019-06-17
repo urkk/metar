@@ -12,11 +12,18 @@ import (
 	cnv "github.com/urkk/metar/conversion"
 	ph "github.com/urkk/metar/phenomena"
 	rwy "github.com/urkk/metar/runways"
+	vis "github.com/urkk/metar/visibility"
 	"github.com/urkk/metar/wind"
 )
 
-// Year, month and day. By default read all messages in the current date. Can be redefined if necessary
-var CurYearStr, CurMonthStr, CurDayStr string
+// CurYearStr - year of message. By default read all messages in the current date. Can be redefined if necessary
+var CurYearStr string
+
+// CurMonthStr - month of message
+var CurMonthStr string
+
+// CurDayStr - day of message
+var CurDayStr string
 
 func init() {
 	now := time.Now()
@@ -37,7 +44,7 @@ type MetarMessage struct {
 	// Ceiling And Visibility OK, indicating no cloud below 5,000 ft (1,500 m) or the highest minimum sector
 	// altitude and no cumulonimbus or towering cumulus at any level, a visibility of 10 km (6 mi) or more and no significant weather change.
 	CAVOK                        bool
-	Visibility                                     // Horizontal visibility. In meters
+	vis.Visibility                                 // Horizontal visibility
 	RWYvisibility                []rwy.VisualRange // Runway visual range
 	ph.Phenomena                                   // Present Weather
 	PhenomenaNotDefined          bool              // Not detected by the automatic station - “//”
@@ -128,34 +135,6 @@ func NewMETAR(inputtext string) (*MetarMessage, error) {
 	// main section
 	m.decodeMetar(tokens[count:totalcount])
 	return m, nil
-}
-
-// Visibility - prevailing visibility
-type Visibility struct {
-	Distance       int
-	LowerDistance  int
-	LowerDirection string
-}
-
-// ParseVisibility - identify and parses the representation oh horizontal visibility
-func (v *Visibility) ParseVisibility(input []string) (tokensused int) {
-
-	inputstring := strings.Join(input, " ")
-	// The literal P (M) is not listed in the documentation, but is used in messages
-	pattern := `^(P|M)?(\d{4})(\s|$)((\d{4})(NE|SE|NW|SW|N|E|S|W))?`
-	if matched, _ := regexp.MatchString(pattern, inputstring); !matched {
-		return
-	}
-	tokensused = 1
-	regex := regexp.MustCompile(pattern)
-	matches := regex.FindStringSubmatch(inputstring)
-	v.Distance, _ = strconv.Atoi(matches[2])
-	if matches[4] != "" {
-		v.LowerDistance, _ = strconv.Atoi(matches[5])
-		v.LowerDirection = matches[6]
-		tokensused++
-	}
-	return
 }
 
 type myRegexp struct {
@@ -288,7 +267,7 @@ func (m *MetarMessage) setAltimetr(input string) bool {
 }
 
 func (m *MetarMessage) appendRunwayVisualRange(input string) bool {
-	if RWYvis, ok := rwy.ParseVisibility(input); ok {
+	if RWYvis, ok := rwy.ParseVisualRange(input); ok {
 		m.RWYvisibility = append(m.RWYvisibility, RWYvis)
 		return true
 	}
