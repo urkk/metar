@@ -1,14 +1,42 @@
 [![Build Status](https://travis-ci.org/urkk/metar.svg?branch=master)](https://travis-ci.org/urkk/metar)
 [![Coverage](https://codecov.io/gh/urkk/metar/branch/master/graph/badge.svg)](https://codecov.io/gh/urkk/metar)
 # METAR
-METAR (METeorological Aerodrome Report) and TAF (terminal aerodrome forecast) message decoder for use in bots, templates and other data visualization.
+METAR (METeorological Aerodrome Report) and TAF (terminal aerodrome forecast) message decoder for use in bots, templates and other data visualization. Raw text messages (as is) are used for decoding.
 
-Suitable for the recognition messages from russians airports, and in the ex-USSR and European countries with some limitations. Based on the format approved by The Federal Service for Hydrometeorology and Environmental Monitoring of Russia.
+Based on the format approved by The Federal Service for Hydrometeorology and Environmental Monitoring of Russia.
+
+## Now supported
+* In metars
+	* Header: station location, date/time, auto/cor/nil
+	* Wind (Wind Variability)
+	* Visibility
+	* Runway Visual Range
+	* Type of Weather
+	* Clouds
+	* Temperature/Dewpoint
+	* Altimeter Setting
+* Metar supplementary informaton
+	* Type of recent weather
+	* State of the runway(s) (as *R24/010060*)
+	* Wind shear on runway(s) (as *WS R24* or *WS ALL RWY*)
+* In tafs
+	* Header: station location, date/time, cor/amd/nil/cnl
+	* Wind
+	* Visibility
+	* Type of Weather
+	* Clouds
+	* Temperatures
+* Both - change expected: wind, visibility, type of Weather, clouds
+
+### Supported units
+* Wind speed: knots, meters per second or kilometer per hour
+* Horizontal visibility: meters or american land miles
+* Runway visual range: meters or feet
+* QNH pressure: hectopascal or inch of mercury
 
 ### Limitations
-* visibility only in meters, not miles.
 * no color codes decoded
-* only russians remarks (no RMK from auto station, etc)
+* only russian style remarks (no RMK from auto station, etc)
 
 ## Example
 ```go
